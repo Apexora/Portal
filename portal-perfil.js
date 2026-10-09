@@ -7,10 +7,10 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection }
 
 /* ⚠ PEGÁ ACÁ EL MISMO firebaseConfig QUE USAN LAS OTRAS PÁGINAS (mismo apiKey = misma sesión compartida) */
 const firebaseConfig = {
-  apiKey: 'AIzaSyAsw466_wzsiLtbjw6FXZ1_O3HQ_AkVyU8',
-  authDomain: 'album-apexora.firebaseapp.com',
-  projectId: 'album-apexora',
-  appId: '1:17231648284:web:20edb8477453f50473f1d9'
+  apiKey: "AIzaSyAsw466_wzsiLtbjw6FXZ1_O3HQ_AkVyU8",
+  authDomain: "album-apexora.firebaseapp.com",
+  projectId: "album-apexora",
+  appId: "1:17231648284:web:20edb8477453f50473f1d9"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -93,7 +93,7 @@ document.head.append(h('style', {}, `
 
 /* ---------- estado ---------- */
 let me = null, prof = null, pd = null;          // usuario, perfil público, doc players/{uid}
-let mode = 'pick', picked = null, tab = 'cuenta', err = '', busy = false, registering = false;
+let view = 'auto', mode = 'pick', picked = null, tab = 'cuenta', err = '', busy = false, registering = false;
 let profiles = null, board = null, boardT = 0, newAv = AVATARS[0];
 
 /* ---------- shell ---------- */
@@ -104,9 +104,10 @@ document.body.append(chip, ov);
 ov.addEventListener('click', e => { if (e.target === ov) closeM(); });
 addEventListener('keydown', e => { if (e.key === 'Escape') closeM(); });
 
-function openM() {
-  ov.classList.add('on'); err = '';
-  if (!me) { mode = 'pick'; picked = null; if (!profiles) loadProfiles(); }
+function openM(v) {
+  ov.classList.add('on'); err = ''; view = v || 'auto';
+  if (view === 'rank') { tab = tab === 'cuenta' ? 'rachas' : tab; loadBoard(); }
+  else if (!me) { mode = 'pick'; picked = null; if (!profiles) loadProfiles(); }
   paint();
 }
 function closeM() { ov.classList.remove('on'); }
@@ -120,7 +121,7 @@ function paintChip() {
 /* ---------- vistas ---------- */
 function paint() {
   card.replaceChildren(h('button', { class: 'pf-x', 'aria-label': 'Cerrar', onclick: closeM }, '×'));
-  card.append(me ? viewAccount() : viewLogin());
+  card.append(view === 'rank' ? viewRank() : me ? viewAccount() : viewLogin());
 }
 
 function viewLogin() {
@@ -166,19 +167,26 @@ function viewAccount() {
         stat('🔥 ' + (st.current || 0), 'Racha actual'), stat(st.best || st.current || 0, 'Mejor racha'),
         stat(fr.comun || 0, 'Fragmentos comunes'), stat(fr.rara || 0, 'Fragmentos raros')),
       h('button', { class: 'pf-link', onclick: () => signOut(auth) }, 'Salir'));
-  } else if (!board) {
-    body.append(h('p', { class: 'pf-note' }, 'Cargando…'));
-  } else if (tab === 'logros') {
+  } else body.append(rankBody());
+  return h('div', {}, h('h3', {}, (prof.avatar || '🙂') + ' ' + prof.name), tabs, body, h('div', { class: 'pf-err' }, err));
+}
+function rankBody() {
+  if (!board) return h('p', { class: 'pf-note' }, err || 'Cargando…');
+  if (tab === 'logros') {
     const rows = board.map(p => ({ p, k: Object.keys(p.logros || {}) })).sort((a, b) => b.k.length - a.k.length || a.p.nombre.localeCompare(b.p.nombre));
-    body.append(table(['Jugador', '#', 'Logros'], rows.map(r => ({ me: r.p.id === me.uid,
+    return h('div', {}, table(['Jugador', '#', 'Logros'], rows.map(r => ({ me: me && r.p.id === me.uid,
       c: [r.p.nombre, String(r.k.length), h('span', { class: 'pf-chips' }, r.k.map(k => h('em', {}, pretty(k))))] }))),
       h('p', { class: 'pf-note' }, 'Vista temporal'));
-  } else {
-    const rows = board.slice().sort((a, b) => (b.streak.current || 0) - (a.streak.current || 0) || (b.streak.best || 0) - (a.streak.best || 0));
-    body.append(table(['#', 'Jugador', '🔥 Actual', 'Mejor'], rows.map((p, i) => ({ me: p.id === me.uid,
-      c: [String(i + 1), p.nombre, String(p.streak.current || 0), String(p.streak.best || p.streak.current || 0)] }))));
   }
-  return h('div', {}, h('h3', {}, (prof.avatar || '🙂') + ' ' + prof.name), tabs, body, h('div', { class: 'pf-err' }, err));
+  const rows = board.slice().sort((a, b) => (b.streak.current || 0) - (a.streak.current || 0) || (b.streak.best || 0) - (a.streak.best || 0));
+  return table(['#', 'Jugador', '🔥 Actual', 'Mejor'], rows.map((p, i) => ({ me: me && p.id === me.uid,
+    c: [String(i + 1), p.nombre, String(p.streak.current || 0), String(p.streak.best || p.streak.current || 0)] })));
+}
+function viewRank() {
+  const t = h('div', { class: 'pf-tabs' }, [['rachas', '🔥 Rachas'], ['logros', 'Logros']].map(([k, l]) =>
+    h('button', { class: tab === k ? 'on' : '', onclick: () => { tab = k; paint(); } }, l)));
+  return h('div', {}, h('h3', {}, 'Rankings'), t, rankBody(),
+    h('button', { class: 'pf-link', onclick: () => { view = 'auto'; mode = 'pick'; err = ''; if (!me && !profiles) loadProfiles(); paint(); } }, me ? 'Mi cuenta' : 'Entrar con mi perfil'));
 }
 const stat = (n, l) => h('div', { class: 'pf-stat' }, h('b', {}, String(n)), h('small', {}, l));
 const table = (head, rows) => h('div', { class: 'pf-tw' }, h('table', {},
@@ -202,7 +210,7 @@ async function loadBoard() {
       board = s.docs.map(d => ({ id: d.id, ...d.data() }))
         .filter(p => typeof p.nombre === 'string' && p.streak && typeof p.streak === 'object');
       boardT = Date.now();
-    } catch (e) { err = msg(e); }
+    } catch (e) { err = 'No se pudo cargar el ranking'; console.warn(e); }
   }
   paint();
 }
@@ -262,4 +270,11 @@ document.querySelectorAll('.panel').forEach(a => a.addEventListener('click', e =
 // al apretar "Comenzar" sin sesión, pedir el login apenas arranca el menú
 document.getElementById('go')?.addEventListener('click', () => setTimeout(() => { if (!me) openM(); }, 1300));
 
+const hero = document.getElementById('hero');
+if (hero) hero.append(
+  h('style', {}, `.pf-rank{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(6% + 4.6rem + env(safe-area-inset-bottom,0px));z-index:3;
+    font-family:var(--titulo);font-size:1.05rem;letter-spacing:.12em;color:#fff;background:rgba(10,18,45,.5);border:1px solid rgba(255,255,255,.6);
+    border-radius:999px;padding:.5em 1.6em;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .pf-rank:hover{background:var(--hielo);color:var(--rosa)}`),
+  h('button', { class: 'pf-rank', onclick: () => openM('rank') }, 'Rankings'));
 paintChip();
