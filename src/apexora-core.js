@@ -1,3 +1,4 @@
+/* apexora-core · UNA cuenta para todo Apexora. Esencia azul = fragmentos.comun · esencia negra = fragmentos.rara */
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
   signInWithEmailAndPassword, signOut } from "firebase/auth";
@@ -15,10 +16,20 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-export const CATALOGO_LOGROS = { tcg_primera_victoria: { nombre: "Primer duelo",  desc: "Gana una partida de Cartas Alfa", icono: "⚔️", juego: "tcg",   premio: { comun: 25 } },
-tcg_10_victorias:     { nombre: "Duelista",      desc: "10 victorias en Cartas Alfa",     icono: "🏆", juego: "tcg",   premio: { comun: 100, rara: 1 } },
-sala_primer_reto:     { nombre: "Desafiante",    desc: "Completa tu primer reto",         icono: "🎯", juego: "sala",  premio: { comun: 25 } },
-album_primer_sobre:   { nombre: "Coleccionista", desc: "Abre tu primer sobre",            icono: "📖", juego: "album", premio: { comun: 25 } }, };
+export const CATALOGO_LOGROS = {
+  // Portal
+  primera_visita:       { nombre: "Primer paso",   desc: "Entraste a Apexora",              icono: "🌱", juego: "portal", premio: { comun: 10 } },
+  racha_3:              { nombre: "Constante",     desc: "3 días seguidos",                 icono: "🔥", juego: "portal", premio: { comun: 20 } },
+  racha_7:              { nombre: "Una semana",    desc: "7 días seguidos",                 icono: "⚡", juego: "portal", premio: { comun: 50, rara: 1 } },
+  racha_30:             { nombre: "Leyenda viva",  desc: "30 días seguidos",                icono: "👑", juego: "portal", premio: { comun: 200, rara: 5 } },
+  // Cartas Alfa
+  tcg_primera_victoria: { nombre: "Primer duelo",  desc: "Gana una partida de Cartas Alfa", icono: "⚔️", juego: "tcg",    premio: { comun: 25 } },
+  tcg_10_victorias:     { nombre: "Duelista",      desc: "10 victorias en Cartas Alfa",     icono: "🏆", juego: "tcg",    premio: { comun: 100, rara: 1 } },
+  // Sala de Desafíos
+  sala_primer_reto:     { nombre: "Desafiante",    desc: "Completa tu primer reto",         icono: "🎯", juego: "sala",   premio: { comun: 25 } },
+  // Álbum
+  album_primer_sobre:   { nombre: "Coleccionista", desc: "Abre tu primer sobre",            icono: "📖", juego: "album",  premio: { comun: 25 } },
+};
 
 const DOMINIO = "@apexora-sala.app";
 const COL = "apexora_players";
