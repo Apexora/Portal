@@ -32,11 +32,15 @@
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
   animation: apx-gira 6s linear infinite;
 }
-.esencia.azul { --c: #9fb2ff; } .esencia.negra { --c: #d9779b; } .racha { --c: #e3b488; }
-.esencia.negra::before { animation-duration: 8s; animation-direction: reverse; }
+.esencia.sinfalita { --c: #3df0ee; } .esencia.odita { --c: #a98be0; } .racha { --c: #e3b488; }
+.esencia.odita::before { animation-duration: 8s; animation-direction: reverse; }
 @keyframes apx-gira { to { --ang: 360deg; } }
-.orbe { animation: apx-late 3.6s ease-in-out infinite; }
-@keyframes apx-late { 50% { transform: scale(1.08); filter: brightness(1.15); } }
+.cristal { animation: apx-flota 4.2s ease-in-out infinite; }
+.odita .cristal { animation-duration: 5.4s; animation-delay: -1.7s; }
+@keyframes apx-flota { 50% { transform: translateY(-3px) rotate(2deg); } }
+.cristal .br { animation: apx-brilla 3.2s ease-in-out infinite; }
+.odita .cristal .br { animation-duration: 4.6s; animation-delay: -2s; }
+@keyframes apx-brilla { 0%, 100% { opacity: .15; } 45% { opacity: .95; } }
 
 /* ---------- Hexágonos en 3D ---------- */
 .rejilla { perspective: 900px; }
@@ -67,7 +71,28 @@
 .viaje { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; pointer-events: all; }
 .viaje span { font: 400 clamp(2.4rem, 10vw, 6rem)/1 var(--apx-display); color: var(--hi, #e3b488); text-shadow: 0 0 40px rgba(0,0,0,.5); text-align: center; padding: 1rem; }
 
+@media (min-width: 1180px) {
+  .barra { max-width: 1400px; }
+  .panel {
+    max-width: 1400px; align-items: start; column-gap: 1.6rem; row-gap: 1.6rem;
+    grid-template-columns: minmax(270px, 310px) minmax(0, 1fr) minmax(270px, 310px);
+    grid-template-areas: "heroe heroe heroe" "act esen lado" "act mundos lado";
+  }
+  .heroe { grid-area: heroe; }
+  .actividad { grid-area: act; }
+  .esencias { grid-area: esen; }
+  .mundos { grid-area: mundos; container-type: inline-size; }
+  .dos { grid-area: lado; grid-template-columns: 1fr; }
+  .rejilla { --w: min(250px, calc(100cqw / 2.5)); }
+  .feed { max-height: 560px; }
+}
+.actividad, .dos > section {
+  background: linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.05)), rgba(28,12,20,.4);
+}
+.hex:focus-visible { outline: none; }
+.hexw:focus-within { filter: drop-shadow(0 0 2px var(--apx-sand)) drop-shadow(0 0 14px rgba(227,180,136,.75)) drop-shadow(0 20px 22px rgba(0,0,0,.45)); }
+
 @media (prefers-reduced-motion: reduce) {
-  .aurora i, .esencias > div::before, .orbe { animation: none !important; }
+  .aurora i, .esencias > div::before, .cristal, .cristal .br { animation: none !important; }
   .apx-spot::after { display: none; }
 }

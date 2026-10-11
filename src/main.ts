@@ -6,6 +6,8 @@ import {
   escucharActividad, escucharFragmentos, describirActividad, NOMBRE_JUEGO,
 } from './apexora-core.js';
 import './fase1.css';
+import { cristal, NOMBRE_CRISTAL } from './cristales.js';
+import { avisarLogros } from './logros.js';
 import { animarPanel, montarAurora, contar, luzDeFoco, entrarEvento, entrarLista, viajar, limpiar } from './fx';
 
 // ← Ajusta las rutas a donde viva cada página
@@ -85,9 +87,9 @@ async function vistaPanel() {
 
   const logros = Object.entries(CATALOGO_LOGROS as Record<string, any>).map(([id, l]) => {
     const ok = !!p.logros?.[id];
-    const premio = [l.premio?.comun ? `+${l.premio.comun} azul` : '', l.premio?.rara ? `+${l.premio.rara} negra` : '']
+    const premio = [l.premio?.comun ? `+${l.premio.comun} sinfalita` : '', l.premio?.rara ? `+${l.premio.rara} odita` : '']
       .filter(Boolean).join(' y ');
-    return `<li class="logro ${ok ? 'ok' : ''}"><span class="ico">${l.icono}</span>
+    return `<li class="logro ${ok ? 'ok' : ''}" data-logro="${esc(id)}"><span class="ico">${l.icono}</span>
       <div><b>${esc(l.nombre)}</b><small>${esc(l.desc)}${premio ? ' · ' + premio : ''}</small></div></li>`;
   }).join('');
 
@@ -101,13 +103,13 @@ async function vistaPanel() {
       <span class="apx-eyebrow">Bienvenido de vuelta</span>
       <h1>${esc(p.nombre)}</h1>
     </section>
-    <section class="esencias" aria-label="Tus esencias">
-      <div class="esencia azul"><span class="orbe"></span><b>${p.fragmentos.comun}</b><small>Esencia azul</small></div>
-      <div class="esencia negra"><span class="orbe"></span><b>${p.fragmentos.rara}</b><small>Esencia negra</small></div>
+    <section class="esencias" aria-label="Tus cristales">
+      <div class="esencia sinfalita">${cristal('sinfalita')}<b>${p.fragmentos.comun}</b><small>${NOMBRE_CRISTAL.comun}</small></div>
+      <div class="esencia odita">${cristal('odita')}<b>${p.fragmentos.rara}</b><small>${NOMBRE_CRISTAL.rara}</small></div>
       <div class="racha"><b>${p.streak.current}</b><small>${p.streak.current === 1 ? 'día seguido' : 'días seguidos'}</small></div>
     </section>
 
-    <section><h2>Elige un mundo</h2>
+    <section class="mundos"><h2>Elige un mundo</h2>
       <div class="rejilla">${JUEGOS.map((j) =>
         `<div class="hexw"><a class="hex m-${j.id}" href="${esc(j.url)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS[j.id]}</svg><b>${esc(j.nombre)}</b><small>${esc(j.desc)}</small><i>Entrar</i></a></div>`).join('')}</div>
     </section>
@@ -135,8 +137,8 @@ async function vistaPanel() {
   montarAurora();
   animarPanel(app);
   luzDeFoco(app);
-  contar(app.querySelector('.esencia.azul b'), p.fragmentos.comun);
-  contar(app.querySelector('.esencia.negra b'), p.fragmentos.rara);
+  contar(app.querySelector('.esencia.sinfalita b'), p.fragmentos.comun);
+  contar(app.querySelector('.esencia.odita b'), p.fragmentos.rara);
   contar(app.querySelector('.racha b'), p.streak.current);
 
   // Transición al entrar a un mundo
@@ -150,16 +152,21 @@ async function vistaPanel() {
     });
   });
 
-  // Marcador en vivo: si ganas esencias jugando en otra pestaña, aquí suben solas
+  // Marcador en vivo: si ganas cristales jugando en otra pestaña, aquí suben solas
   const act = { comun: p.fragmentos.comun, rara: p.fragmentos.rara, racha: p.streak.current };
   offFrag = escucharFragmentos((d: any) => {
     const n = { comun: d.fragmentos?.comun ?? 0, rara: d.fragmentos?.rara ?? 0, racha: d.streak?.current ?? 0 };
-    if (n.comun !== act.comun) contar(app.querySelector('.esencia.azul b'), n.comun, act.comun);
-    if (n.rara !== act.rara) contar(app.querySelector('.esencia.negra b'), n.rara, act.rara);
+    if (n.comun !== act.comun) contar(app.querySelector('.esencia.sinfalita b'), n.comun, act.comun);
+    if (n.rara !== act.rara) contar(app.querySelector('.esencia.odita b'), n.rara, act.rara);
     if (n.racha !== act.racha) contar(app.querySelector('.racha b'), n.racha, act.racha);
     Object.assign(act, n);
+    if (d.logros) {
+      avisarLogros(uid, d.logros, CATALOGO_LOGROS);
+      Object.keys(d.logros).forEach((id) => app.querySelector(`[data-logro="${id}"]`)?.classList.add('ok'));
+    }
   });
 
+  avisarLogros(uid, p.logros, CATALOGO_LOGROS);   // p.ej. "Primer paso" / rachas, que se otorgan justo al entrar
   iniciarFeed();
 }
 

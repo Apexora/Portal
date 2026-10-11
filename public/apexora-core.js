@@ -1,4 +1,4 @@
-/* apexora-core · UNA cuenta para todo Apexora. Esencia azul = fragmentos.comun · esencia negra = fragmentos.rara */
+/* apexora-core · UNA cuenta para todo Apexora. Sinfalita (cristal cian) = fragmentos.comun · Odita (cristal negro) = fragmentos.rara */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
   signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -111,8 +111,8 @@ export async function desbloquearLogro(id) {
   return ok;
 }
 
-/* ---------- Esencias ----------
-   comun = azul, rara = negra.
+/* ---------- Cristales ----------
+   comun = Sinfalita, rara = Odita.
    premiar(): úsalo al terminar una partida. Máx 60 por premio y 300 por día;
    la rara solo puede salir una vez cada 6 h. Devuelve lo que realmente se dio. */
 export async function premiar(comun, probRara = 0) {

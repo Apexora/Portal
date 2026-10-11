@@ -110,8 +110,8 @@ export async function desbloquearLogro(id) {
   return ok;
 }
 
-/* ---------- Esencias ----------
-   comun = azul, rara = negra.
+/* ---------- Cristales ----------
+   comun = Sinfalita, rara = Odita.
    premiar(): úsalo al terminar una partida. Máx 60 por premio y 300 por día;
    la rara solo puede salir una vez cada 6 h. Devuelve lo que realmente se dio. */
 export async function premiar(comun, probRara = 0) {
