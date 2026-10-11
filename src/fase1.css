@@ -1,0 +1,73 @@
+/* Fase 1 · actividad + movimiento. Se carga después de style.css (lo importa main.ts). */
+
+/* ---------- Aurora: tres manchas de color que derivan detrás del contenido ---------- */
+.aurora { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; mix-blend-mode: screen; opacity: .55; }
+.aurora i { position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%; filter: blur(70px); will-change: transform; }
+.aurora i:nth-child(1) { left: -12vmax; top: -10vmax; background: radial-gradient(circle, rgba(6,148,148,.55), transparent 65%); animation: apx-deriva-a 22s ease-in-out infinite alternate; }
+.aurora i:nth-child(2) { right: -14vmax; top: 8vmax; background: radial-gradient(circle, rgba(182,78,111,.6), transparent 65%); animation: apx-deriva-b 26s ease-in-out infinite alternate; }
+.aurora i:nth-child(3) { left: 22vw; bottom: -22vmax; background: radial-gradient(circle, rgba(227,180,136,.5), transparent 65%); animation: apx-deriva-c 30s ease-in-out infinite alternate; }
+@keyframes apx-deriva-a { to { transform: translate(14vw, 16vh) scale(1.15); } }
+@keyframes apx-deriva-b { to { transform: translate(-18vw, 12vh) scale(.9); } }
+@keyframes apx-deriva-c { to { transform: translate(-10vw, -14vh) scale(1.2); } }
+
+/* ---------- Letras del título ---------- */
+.heroe h1 { overflow: hidden; padding-bottom: .12em; }
+.ltr { display: inline-block; will-change: transform; }
+
+/* ---------- Spotlight: foco de luz que sigue al cursor ---------- */
+.apx-spot { position: relative; overflow: hidden; }
+.apx-spot::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .35s;
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.16), transparent 45%);
+}
+.apx-spot:hover::after { opacity: 1; }
+
+/* ---------- Borde en movimiento (esencias y racha) ---------- */
+@property --ang { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.esencias > div { position: relative; isolation: isolate; }
+.esencias > div::before {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: -1;
+  background: conic-gradient(from var(--ang), transparent 0 62%, var(--c, #e3b488) 82%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: apx-gira 6s linear infinite;
+}
+.esencia.azul { --c: #9fb2ff; } .esencia.negra { --c: #d9779b; } .racha { --c: #e3b488; }
+.esencia.negra::before { animation-duration: 8s; animation-direction: reverse; }
+@keyframes apx-gira { to { --ang: 360deg; } }
+.orbe { animation: apx-late 3.6s ease-in-out infinite; }
+@keyframes apx-late { 50% { transform: scale(1.08); filter: brightness(1.15); } }
+
+/* ---------- Hexágonos en 3D ---------- */
+.rejilla { perspective: 900px; }
+.hex { transform-style: preserve-3d; will-change: transform; }
+.hex::after { transition: opacity .3s; }
+
+/* ---------- Actividad ---------- */
+.actividad { padding: 1.4rem; border-radius: 24px; background: linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.05));
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.18); }
+.act-cab { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.act-cab h2 { margin: 0; }
+.filtros { display: flex; gap: .4rem; flex-wrap: wrap; }
+.chip { cursor: pointer; border: 1px solid rgba(255,255,255,.3); background: rgba(20,8,14,.3); border-radius: 999px; padding: .3rem .85rem; font-size: .8rem; font-weight: 500; transition: background .2s, border-color .2s, transform .15s; }
+.chip:hover { transform: translateY(-1px); border-color: var(--apx-sand); }
+.chip.on { background: rgba(227,180,136,.3); border-color: var(--apx-sand); }
+.feed { display: grid; max-height: 420px; overflow: auto; padding-right: .3rem; scrollbar-width: thin; scrollbar-color: rgba(227,180,136,.5) transparent; }
+.feed li { display: flex; gap: .75rem; align-items: flex-start; padding: .65rem .4rem; border-bottom: 1px solid rgba(255,255,255,.12); border-radius: 10px; overflow: hidden; }
+.feed li:last-child { border-bottom: 0; }
+.feed li[hidden] { display: none; }
+.feed .av { display: grid; place-items: center; flex: none; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: rgba(255,255,255,.16); font-size: 1.15rem; }
+.feed .tx { line-height: 1.35; }
+.feed small { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .2rem; font-size: .75rem; }
+.tag { padding: .08rem .55rem; border-radius: 999px; font-size: .68rem; font-weight: 600; letter-spacing: .04em; color: #fff; }
+.t-tcg { background: #b10821; } .t-album { background: #8d7a35; } .t-sala { background: #069494; } .t-portal { background: #8a4a67; }
+.feed .vacio { display: block; color: var(--suave); text-align: center; padding: 1.2rem 0; border: 0; }
+
+/* ---------- Transición al entrar a un mundo ---------- */
+.viaje { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; pointer-events: all; }
+.viaje span { font: 400 clamp(2.4rem, 10vw, 6rem)/1 var(--apx-display); color: var(--hi, #e3b488); text-shadow: 0 0 40px rgba(0,0,0,.5); text-align: center; padding: 1rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora i, .esencias > div::before, .orbe { animation: none !important; }
+  .apx-spot::after { display: none; }
+}

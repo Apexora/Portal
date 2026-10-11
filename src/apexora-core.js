@@ -1,9 +1,9 @@
 /* apexora-core · UNA cuenta para todo Apexora. Esencia azul = fragmentos.comun · esencia negra = fragmentos.rara */
-import { initializeApp } from "firebase/app";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, signOut } from "firebase/auth";
+  signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, runTransaction, updateDoc, increment,
-  serverTimestamp, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
+  serverTimestamp, collection, query, orderBy, limit, getDocs, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAsw466_wzsiLtbjw6FXZ1_O3HQ_AkVyU8",
@@ -99,7 +99,7 @@ export async function registrarVisita() {
 export async function desbloquearLogro(id) {
   const def = CATALOGO_LOGROS[id]; if (!auth.currentUser || !def) return false;
   const ref = refJugador();
-  return runTransaction(db, async (tx) => {
+  const ok = await runTransaction(db, async (tx) => {
     const s = await tx.get(ref);
     if (!s.exists() || s.data().logros?.[id]) return false;
     const upd = { [`logros.${id}`]: { fecha: serverTimestamp(), juego: def.juego } };
@@ -107,6 +107,8 @@ export async function desbloquearLogro(id) {
     tx.update(ref, upd);
     return true;
   });
+  if (ok) registrarActividad(def.juego, "logro", { nombre: def.nombre, icono: def.icono });
+  return ok;
 }
 
 /* ---------- Esencias ----------
@@ -161,3 +163,65 @@ export async function ranking(n = 10) {
 /** Enlaza esta cuenta Apexora con la identidad propia de un juego (p. ej. jugador del Álbum). */
 export const vincular = (juego, id) =>
   updateDoc(refJugador(), { [`vinculos.${juego}`]: id });
+
+/* ---------- Actividad de jugadores (feed del Portal) ----------
+   Colección apexora_activity: un documento por evento. Solo se crean (las rules no permiten editar ni borrar).
+   El texto se arma en el cliente con describirActividad(): nunca se guarda HTML. */
+const COL_ACT = "apexora_activity";
+let _yo = null;
+async function quienSoy() {
+  const u = auth.currentUser; if (!u) return null;
+  if (_yo && _yo.uid === u.uid) return _yo;
+  let nombre = u.email.split("@")[0], avatar = "🙂";
+  try {
+    const s = await getDoc(doc(db, "apexora_profiles", u.uid));
+    if (s.exists()) { nombre = s.data().name || nombre; avatar = s.data().avatar || avatar; }
+  } catch { /* se queda con lo básico */ }
+  return (_yo = { uid: u.uid, nombre, avatar });
+}
+
+/** juego: "tcg" | "album" | "sala" | "portal"   tipo: "sobre" | "duelo" | "reto" | "logro"   datos: objeto chico (máx. 6 claves) */
+export async function registrarActividad(juego, tipo, datos = {}) {
+  try {
+    const y = await quienSoy(); if (!y) return false;
+    const limpio = {};
+    for (const [k, v] of Object.entries(datos).slice(0, 6))
+      limpio[k] = typeof v === "number" || typeof v === "boolean" ? v : String(v).slice(0, 40);
+    await addDoc(collection(db, COL_ACT), {
+      uid: y.uid, nombre: String(y.nombre).slice(0, 24), avatar: String(y.avatar).slice(0, 8),
+      juego, tipo, datos: limpio, ts: serverTimestamp(),
+    });
+    return true;
+  } catch { return false; }
+}
+
+export const NOMBRE_JUEGO = { tcg: "Cartas Alfa", album: "Álbum", sala: "Sala de Desafíos", portal: "Portal" };
+
+/** Texto plano de un evento (el que lo pinte debe escaparlo). */
+export function describirActividad(e) {
+  const n = e.nombre || "Alguien", d = e.datos || {};
+  switch (e.tipo) {
+    case "sobre":  return `${n} abrió un sobre${d.sobre ? " " + d.sobre : ""}`;
+    case "duelo":  return d.ia ? `${n} venció a la IA en Cartas Alfa`
+                                : `${n} y ${d.rival || "un rival"} jugaron a Cartas Alfa y ganó ${n}`;
+    case "reto":   return d.gano ? `${n} superó el reto «${d.modo}»` : `${n} intentó el reto «${d.modo}»`;
+    case "logro":  return `${n} desbloqueó el logro «${d.nombre}» ${d.icono || ""}`.trim();
+    default:       return `${n} anda por ${NOMBRE_JUEGO[e.juego] || "Apexora"}`;
+  }
+}
+
+/** Escucha en vivo los últimos eventos de todos los jugadores. Devuelve la función para dejar de escuchar. */
+export function escucharActividad(cb, n = 30) {
+  const q = query(collection(db, COL_ACT), orderBy("ts", "desc"), limit(n));
+  return onSnapshot(q, (s) => cb(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => cb([]));
+}
+
+/** Escucha en vivo mis fragmentos y mi racha (el marcador). cb({ fragmentos, streak, ... }) */
+export function escucharFragmentos(cb) {
+  let off = () => {};
+  const offAuth = onAuthStateChanged(auth, (u) => {
+    off();
+    if (u?.email?.endsWith(DOMINIO)) off = onSnapshot(doc(db, COL, u.uid), (s) => { if (s.exists()) cb(s.data()); }, () => {});
+  });
+  return () => { off(); offAuth(); };
+}

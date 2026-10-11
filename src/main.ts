@@ -3,7 +3,10 @@ import { doc, getDoc } from 'firebase/firestore';
 import {
   auth, db, onSesion, iniciarSesion, registrar, cerrarSesion,
   registrarVisita, obtenerPerfil, ranking, CATALOGO_LOGROS,
+  escucharActividad, escucharFragmentos, describirActividad, NOMBRE_JUEGO,
 } from './apexora-core.js';
+import './fase1.css';
+import { animarPanel, montarAurora, contar, luzDeFoco, entrarEvento, entrarLista, viajar, limpiar } from './fx';
 
 // ← Ajusta las rutas a donde viva cada página
 const ICONOS: Record<string, string> = {
@@ -18,6 +21,9 @@ const JUEGOS = [
   { id: 'sala', nombre: 'Sala de Desafíos', desc: 'Retos y puntos', url: '/Desafio/' },
   { id: 'lore', nombre: 'Lore', desc: 'Historia y datos del universo', url: '/Lore/' },
 ];
+const CLIMA: Record<string, [string, string]> = {   // [color alto, color bajo] de cada mundo (los mismos de apexora-ui.css)
+  tcg: ['#d56e6f', '#b10821'], album: ['#e3b488', '#a99441'], sala: ['#5fd0c8', '#069494'], lore: ['#a9c4a7', '#759773'],
+};
 const AVATARES = ['🦊', '🐺', '🦉', '🐉', '🦁', '🐙', '🦅', '🐢'];
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -106,19 +112,128 @@ async function vistaPanel() {
         `<div class="hexw"><a class="hex m-${j.id}" href="${esc(j.url)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS[j.id]}</svg><b>${esc(j.nombre)}</b><small>${esc(j.desc)}</small><i>Entrar</i></a></div>`).join('')}</div>
     </section>
 
+    <section class="actividad apx-spot" aria-label="Actividad de los jugadores">
+      <div class="act-cab">
+        <h2>Actividad</h2>
+        <div class="filtros" role="group" aria-label="Filtrar por mundo">
+          <button class="chip on" data-f="todo">Todo</button>
+          <button class="chip" data-f="tcg">Cartas</button>
+          <button class="chip" data-f="album">Álbum</button>
+          <button class="chip" data-f="sala">Desafíos</button>
+        </div>
+      </div>
+      <ul class="feed" id="feed"><li class="vacio">Cargando actividad…</li></ul>
+    </section>
+
     <div class="dos">
-      <section><h2>Logros</h2><ul class="logros">${logros}</ul></section>
-      <section><h2>Mejores rachas</h2><ol class="rank">${top.map((r: any) =>
+      <section class="apx-spot"><h2>Logros</h2><ul class="logros">${logros}</ul></section>
+      <section class="apx-spot"><h2>Mejores rachas</h2><ol class="rank">${top.map((r: any) =>
         `<li><span>${esc(r.nombre)}</span><b>${r.streak?.best ?? 0}</b></li>`).join('')}</ol></section>
     </div>
   </main>`;
-  app.querySelector<HTMLButtonElement>('#salir')!.onclick = () => cerrarSesion();
+  app.querySelector<HTMLButtonElement>('#salir')!.onclick = () => { detener(); cerrarSesion(); };
+  montarAurora();
+  animarPanel(app);
+  luzDeFoco(app);
+  contar(app.querySelector('.esencia.azul b'), p.fragmentos.comun);
+  contar(app.querySelector('.esencia.negra b'), p.fragmentos.rara);
+  contar(app.querySelector('.racha b'), p.streak.current);
+
+  // Transición al entrar a un mundo
+  app.querySelectorAll<HTMLAnchorElement>('a.hex').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      const id = [...a.classList].find((c) => c.startsWith('m-'))!.slice(2);
+      const [hi, lo] = CLIMA[id] ?? ['#e3b488', '#b64e6f'];
+      viajar(a.href, a.querySelector('b')!.textContent ?? '', hi, lo, e.clientX, e.clientY);
+    });
+  });
+
+  // Marcador en vivo: si ganas esencias jugando en otra pestaña, aquí suben solas
+  const act = { comun: p.fragmentos.comun, rara: p.fragmentos.rara, racha: p.streak.current };
+  offFrag = escucharFragmentos((d: any) => {
+    const n = { comun: d.fragmentos?.comun ?? 0, rara: d.fragmentos?.rara ?? 0, racha: d.streak?.current ?? 0 };
+    if (n.comun !== act.comun) contar(app.querySelector('.esencia.azul b'), n.comun, act.comun);
+    if (n.rara !== act.rara) contar(app.querySelector('.esencia.negra b'), n.rara, act.rara);
+    if (n.racha !== act.racha) contar(app.querySelector('.racha b'), n.racha, act.racha);
+    Object.assign(act, n);
+  });
+
+  iniciarFeed();
 }
+
+/* ---------- Feed de actividad ---------- */
+let offFrag: (() => void) | null = null;
+let offAct: (() => void) | null = null;
+let reloj = 0;
+let filtro = 'todo';
+const vistos = new Set<string>();
+let primeraCarga = true;
+
+const tms = (e: any): number => e.ts?.toMillis?.() ?? Date.now();
+function hace(ms: number): string {
+  const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  if (m < 1) return 'ahora';
+  if (m < 60) return `hace ${m} min`;
+  if (m < 1440) return `hace ${Math.round(m / 60)} h`;
+  return `hace ${Math.round(m / 1440)} d`;
+}
+function itemFeed(e: any): string {
+  const j = String(e.juego ?? 'portal');
+  return `<li data-id="${esc(e.id)}" data-j="${esc(j)}">
+    <span class="av">${esc(e.avatar ?? '🙂')}</span>
+    <div class="tx">${esc(describirActividad(e))}<small><span class="tag t-${esc(j)}">${esc((NOMBRE_JUEGO as Record<string, string>)[j] ?? 'Apexora')}</span> <time data-ms="${tms(e)}">${hace(tms(e))}</time></small></div>
+  </li>`;
+}
+function aplicarFiltro() {
+  document.querySelectorAll<HTMLLIElement>('#feed li[data-j]').forEach((li) => {
+    li.hidden = !(filtro === 'todo' || li.dataset.j === filtro);
+  });
+}
+function iniciarFeed() {
+  detenerFeed();
+  const ul = document.querySelector<HTMLUListElement>('#feed')!;
+  document.querySelectorAll<HTMLButtonElement>('.filtros .chip').forEach((b) => {
+    b.onclick = () => {
+      filtro = b.dataset.f!;
+      document.querySelectorAll('.filtros .chip').forEach((x) => x.classList.toggle('on', x === b));
+      aplicarFiltro();
+    };
+  });
+  offAct = escucharActividad((evs: any[]) => {
+    if (!evs.length) { ul.innerHTML = '<li class="vacio">Todavía no hay actividad. ¡Sé el primero!</li>'; return; }
+    if (primeraCarga) {
+      ul.innerHTML = evs.map(itemFeed).join('');
+      evs.forEach((e) => vistos.add(e.id));
+      entrarLista([...ul.children] as HTMLElement[]);
+      primeraCarga = false;
+    } else {
+      // Solo se insertan los eventos nuevos (con animación); los demás no se tocan
+      ul.querySelector('.vacio')?.remove();
+      [...evs].reverse().filter((e) => !vistos.has(e.id)).forEach((e) => {
+        vistos.add(e.id);
+        ul.insertAdjacentHTML('afterbegin', itemFeed(e));
+        entrarEvento(ul.firstElementChild as HTMLElement);
+      });
+      while (ul.children.length > 40) ul.lastElementChild!.remove();
+    }
+    aplicarFiltro();
+  }, 30);
+  reloj = window.setInterval(() => {
+    document.querySelectorAll<HTMLElement>('#feed time[data-ms]').forEach((t) => { t.textContent = hace(Number(t.dataset.ms)); });
+  }, 30000);
+}
+function detenerFeed() {
+  offAct?.(); offAct = null; clearInterval(reloj);
+  vistos.clear(); primeraCarga = true;
+}
+function detener() { detenerFeed(); offFrag?.(); offFrag = null; limpiar(); }
 
 /* ---------- Arranque ---------- */
 let ocupado = false;
 onSesion(async (u: object | null) => {
-  if (!u || !(u as { email?: string | null }).email?.endsWith('@apexora-sala.app')) { vistaLogin(); return; }
+  if (!u || !(u as { email?: string | null }).email?.endsWith('@apexora-sala.app')) { detener(); vistaLogin(); return; }
   if (ocupado) return;
   ocupado = true;
   try {
