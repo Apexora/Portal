@@ -108,7 +108,7 @@ async function vistaPanel() {
 /* ---------- Arranque ---------- */
 let ocupado = false;
 onSesion(async (u: object | null) => {
-  if (!u) { vistaLogin(); return; }
+  if (!u || !(u as { email?: string | null }).email?.endsWith('@apexora-sala.app')) { vistaLogin(); return; }
   if (ocupado) return;
   ocupado = true;
   try {

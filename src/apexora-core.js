@@ -114,8 +114,8 @@ export async function desbloquearLogro(id) {
    premiar(): úsalo al terminar una partida. Máx 60 por premio y 300 por día;
    la rara solo puede salir una vez cada 6 h. Devuelve lo que realmente se dio. */
 export async function premiar(comun, probRara = 0) {
-  const ref = refJugador();
   try {
+    const ref = refJugador();
     return await runTransaction(db, async (tx) => {
       const x = (await tx.get(ref)).data(), dia = hoy();
       const previo = x.cupo?.dia === dia ? x.cupo.comun : 0;
@@ -157,3 +157,7 @@ export async function ranking(n = 10) {
   const q = query(collection(db, COL), orderBy("streak.best", "desc"), limit(n));
   return (await getDocs(q)).docs.map((d) => ({ uid: d.id, ...d.data() }));
 }
+
+/** Enlaza esta cuenta Apexora con la identidad propia de un juego (p. ej. jugador del Álbum). */
+export const vincular = (juego, id) =>
+  updateDoc(refJugador(), { [`vinculos.${juego}`]: id });
