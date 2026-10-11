@@ -2,7 +2,9 @@
    <script type="module" src="https://apexora.github.io/Portal/apexora-hud.js"></script>
    Solo aparece si hay sesión Apexora. Posición ajustable desde el CSS de cada app (pon `auto` en los lados que no uses):
    :root { --apx-hud-top: 12px; --apx-hud-right: 12px; --apx-hud-bottom: auto; --apx-hud-left: auto; --apx-toast-top: 12px; } */
-import { escucharFragmentos, escucharActividad, describirActividad, NOMBRE_JUEGO, onSesion } from "./apexora-core.js";
+import { cristal } from "./apexora-cristales.js";
+import { avisarLogros } from "./apexora-logros.js";
+import { auth, CATALOGO_LOGROS, escucharFragmentos, escucharActividad, describirActividad, NOMBRE_JUEGO, onSesion } from "./apexora-core.js";
 
 const omitir = window.top !== window || /[?&]embed/.test(location.search) || window.__APX_HUD__;
 if (!omitir) {
@@ -28,9 +30,10 @@ css.textContent = `
 .apx-hud__pill:focus-visible{outline:2px solid var(--apx-sand,#e3b488);outline-offset:3px}
 .apx-hud__it{display:flex;align-items:center;gap:.38rem;position:relative}
 .apx-hud__it b{font:400 1.05rem/1 var(--apx-display,Georgia,serif);font-variant-numeric:tabular-nums;min-width:1ch}
-.apx-hud__orb{width:1.15rem;height:1.15rem;border-radius:50%;flex:none}
-.apx-hud__it.azul .apx-hud__orb{background:radial-gradient(circle at 35% 30%,#d6e0ff,#6f7fd0 45%,#3a4176);box-shadow:0 0 12px #6f7fd0aa}
-.apx-hud__it.negra .apx-hud__orb{background:radial-gradient(circle at 35% 30%,#7a4d79,#2a1228 55%,#0d0509);box-shadow:0 0 0 1.5px #b64e6fcc,0 0 12px #b64e6f77}
+.apx-hud__cr{display:grid;place-items:center;width:1rem;height:1.35rem;flex:none}
+.apx-hud__cr .cristal{width:100%;height:100%;overflow:visible}
+.apx-hud__it.sinfalita .cristal{filter:drop-shadow(0 0 5px rgba(61,240,238,.8))}
+.apx-hud__it.odita .cristal{filter:drop-shadow(0 0 .5px rgba(190,165,240,.95)) drop-shadow(0 0 7px rgba(150,110,210,.55))}
 .apx-hud__it.racha .fl{font-size:1rem;line-height:1}
 .apx-hud__sep{width:1px;height:1.1rem;background:rgba(255,255,255,.22)}
 .apx-hud__panel{position:absolute;top:calc(100% + 10px);right:0;width:min(330px,calc(100vw - 24px));padding:.9rem .95rem;border-radius:20px;transform-origin:100% 0;
@@ -48,7 +51,7 @@ css.textContent = `
 .apx-hud__more{display:inline-block;margin-top:.7rem;color:var(--apx-sand,#e3b488);font-size:.8rem;text-decoration:underline;text-underline-offset:3px}
 .apx-hud__vacio{opacity:.7;font-size:.82rem}
 .apx-hud__plus{position:absolute;left:50%;top:0;pointer-events:none;font:400 1.1rem/1 var(--apx-display,Georgia,serif);white-space:nowrap;text-shadow:0 2px 10px rgba(0,0,0,.6)}
-.apx-hud__plus.azul{color:#b9c6ff}.apx-hud__plus.negra{color:#ee9bb6}
+.apx-hud__plus.sinfalita{color:#8ff8f4}.apx-hud__plus.odita{color:#c3aef0}
 .apx-hud__dot{position:fixed;width:7px;height:7px;border-radius:50%;pointer-events:none;z-index:2147482100}
 .apx-toasts{position:fixed;z-index:2147482000;left:50%;transform:translateX(-50%);top:var(--apx-toast-top,calc(env(safe-area-inset-top,0px) + 12px));display:grid;gap:.5rem;justify-items:center;pointer-events:none;font:500 .85rem/1.25 var(--apx-body,system-ui,sans-serif)}
 .apx-toast{padding:.55rem .85rem;border-radius:14px;color:#f7ece0;max-width:min(300px,calc(100vw - 24px));
@@ -63,9 +66,9 @@ const hud = document.createElement("div");
 hud.className = "apx-hud";
 hud.hidden = true;
 hud.innerHTML = `
-  <button class="apx-hud__pill" type="button" aria-expanded="false" aria-label="Tus fragmentos y la actividad de los jugadores">
-    <span class="apx-hud__it azul" title="Esencia azul"><i class="apx-hud__orb"></i><b data-k="comun">0</b></span>
-    <span class="apx-hud__it negra" title="Esencia negra"><i class="apx-hud__orb"></i><b data-k="rara">0</b></span>
+  <button class="apx-hud__pill" type="button" aria-expanded="false" aria-label="Tus cristales y la actividad de los jugadores">
+    <span class="apx-hud__it sinfalita" title="Sinfalita"><i class="apx-hud__cr">${cristal("sinfalita")}</i><b data-k="comun">0</b></span>
+    <span class="apx-hud__it odita" title="Odita"><i class="apx-hud__cr">${cristal("odita")}</i><b data-k="rara">0</b></span>
     <span class="apx-hud__sep"></span>
     <span class="apx-hud__it racha" title="Racha de días"><span class="fl">🔥</span><b data-k="racha">0</b></span>
   </button>
@@ -103,17 +106,17 @@ function chispas(origen, color) {
   }
 }
 
-function ganancia(k, n) {
+function ganancia(k, n, silencio) {
   const item = el[k].closest(".apx-hud__it");
-  const tipo = k === "comun" ? "azul" : k === "rara" ? "negra" : "";
-  aviso(k === "racha" ? `🔥 Racha de ${n} ${n === 1 ? "día" : "días"}` : `+${n} ${k === "comun" ? "esencia azul" : "esencia negra"}`);
+  const tipo = k === "comun" ? "sinfalita" : k === "rara" ? "odita" : "";
+  if (!silencio) aviso(k === "racha" ? `🔥 Racha de ${n} ${n === 1 ? "día" : "días"}` : `+${n} ${k === "comun" ? "sinfalita" : "odita"}`);
   if (!anima) return;
   gsap.fromTo(item, { scale: 1 }, { scale: 1.28, duration: .18, yoyo: true, repeat: 1, ease: "power2.out" });
   if (tipo) {
     const p = document.createElement("span"); p.className = `apx-hud__plus ${tipo}`; p.textContent = `+${n}`; item.appendChild(p);
     gsap.fromTo(p, { y: 4, x: "-50%", opacity: 0 }, { y: 34, opacity: 1, duration: .35, ease: "back.out(2)" });
     gsap.to(p, { y: 52, opacity: 0, duration: .5, delay: 1, ease: "power1.in", onComplete: () => p.remove() });
-    chispas(item.querySelector(".apx-hud__orb"), tipo === "azul" ? "#9fb2ff" : "#d9779b");
+    chispas(item.querySelector(".apx-hud__cr"), tipo === "sinfalita" ? "#3df0ee" : "#a98be0");
   }
 }
 
@@ -130,18 +133,22 @@ const leerUlt = () => { try { return JSON.parse(localStorage.getItem(GUARDA) || 
 let primera = true;
 const offFrag = escucharFragmentos((d) => {
   const nuevo = { comun: d.fragmentos?.comun ?? 0, rara: d.fragmentos?.rara ?? 0, racha: d.streak?.current ?? 0 };
+  // Logro desbloqueado → tarjeta al instante. Lo que el logro paga ya sale en la tarjeta: no se repite como "+n".
+  const logrados = avisarLogros(auth.currentUser?.uid, d.logros, CATALOGO_LOGROS);
+  const cubierto = { comun: 0, rara: 0 };
+  for (const id of logrados) for (const k of ["comun", "rara"]) cubierto[k] += CATALOGO_LOGROS[id]?.premio?.[k] ?? 0;
   if (primera) {
     primera = false; hud.hidden = false;
     // Si venías de otra página, parte del último valor que viste: así las ganancias nuevas se notan.
     const ult = leerUlt();
     for (const k of ["comun", "rara", "racha"]) { val[k] = ult ? Math.min(ult[k] ?? 0, nuevo[k]) : nuevo[k]; el[k].textContent = val[k]; }
     if (anima) gsap.from(hud, { y: -26, opacity: 0, duration: .6, ease: "back.out(1.7)" });
-    setTimeout(() => aplicar(nuevo), 500);
-  } else aplicar(nuevo);
+    setTimeout(() => aplicar(nuevo, cubierto), 500);
+  } else aplicar(nuevo, cubierto);
 });
-function aplicar(n) {
+function aplicar(n, cubierto = {}) {
   for (const k of ["comun", "rara", "racha"]) {
-    if (n[k] > val[k]) ganancia(k, n[k] - val[k]);
+    if (n[k] > val[k]) ganancia(k, n[k] - val[k], n[k] - val[k] <= (cubierto[k] ?? 0));
     if (n[k] !== val[k]) contar(k, n[k]);
   }
   try { localStorage.setItem(GUARDA, JSON.stringify(n)); } catch { /* ignorar */ }
