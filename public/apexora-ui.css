@@ -1,0 +1,61 @@
+/* Apexora UI · sistema visual compartido. Se publica en https://apexora.github.io/Portal/apexora-ui.css
+   Paleta (de tu imagen): salvia #759773 · arena #e3b488 · oliva #a99441 · coral #d56e6f · carmesí #b10821
+   rosa #b64e6f · turquesa #069494 · índigo #3a4176 · ciruela #422343 · corteza #351b16 */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@font-face { font-family: "Arcane Fable"; src: url("./arcane-fable.otf") format("opentype"); font-weight: 400; font-display: swap; }
+
+:root {
+  --apx-sage: #759773; --apx-sand: #e3b488; --apx-olive: #a99441; --apx-coral: #d56e6f; --apx-crimson: #b10821;
+  --apx-rose: #b64e6f; --apx-teal: #069494; --apx-indigo: #3a4176; --apx-plum: #422343; --apx-bark: #351b16;
+  --apx-cream: #f7ece0;
+  --apx-display: "Arcane Fable", "Cinzel", Georgia, serif;   /* solo títulos: es decorativa, no sirve para párrafos */
+  --apx-body: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --apx-r: 22px;
+}
+
+/* ---- Un "clima" por plataforma: <html data-mood="portal|tcg|album|sala|lore"> ---- */
+:root[data-mood="portal"] { --m-name: "Apexora";          --m-hi: #e3b488; --m-lo: #b64e6f; --m-bg: #2a1420; }
+:root[data-mood="tcg"]    { --m-name: "Cartas Alfa";      --m-hi: #d56e6f; --m-lo: #b10821; --m-bg: #1f0d14; }
+:root[data-mood="album"]  { --m-name: "Álbum";            --m-hi: #e3b488; --m-lo: #a99441; --m-bg: #2a1712; }
+:root[data-mood="sala"]   { --m-name: "Sala de Desafíos"; --m-hi: #5fd0c8; --m-lo: #069494; --m-bg: #161a36; }
+:root[data-mood="lore"]   { --m-name: "Lore";             --m-hi: #a9c4a7; --m-lo: #759773; --m-bg: #1d120d; }
+
+/* ---- Llegada: al entrar a una plataforma (una vez por sesión) un iris con su nombre se cierra ---- */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-mood]:not(.apx-seen)::after {
+    content: var(--m-name); position: fixed; inset: 0; z-index: 2147483000; pointer-events: none;
+    display: grid; place-items: center; text-align: center; padding: 1rem;
+    font: 400 clamp(2.4rem, 10vw, 6.5rem)/1 var(--apx-display); letter-spacing: .05em; color: var(--m-hi);
+    text-shadow: 0 0 40px var(--m-lo);
+    background: radial-gradient(110% 80% at 50% 100%, color-mix(in srgb, var(--m-lo) 55%, transparent), transparent 70%), var(--m-bg);
+    animation: apx-iris 1.5s cubic-bezier(.7, 0, .2, 1) .1s forwards;
+  }
+}
+@keyframes apx-iris {
+  0%, 45% { clip-path: circle(150% at 50% 50%); opacity: 1; visibility: visible; }
+  99%     { clip-path: circle(0% at 50% 50%); opacity: 1; visibility: visible; }
+  100%    { clip-path: circle(0% at 50% 50%); opacity: 0; visibility: hidden; }
+}
+
+/* ---- Piezas comunes ---- */
+.apx-display { font-family: var(--apx-display); font-weight: 400; font-synthesis: none; }
+.apx-eyebrow { font: 500 .72rem/1.3 var(--apx-body); letter-spacing: .32em; text-transform: uppercase; color: var(--m-hi, var(--apx-sand)); }
+.apx-glass {
+  background: linear-gradient(160deg, rgba(255,255,255,.15), rgba(255,255,255,.05));
+  -webkit-backdrop-filter: blur(18px) saturate(1.25); backdrop-filter: blur(18px) saturate(1.25);
+  border: 1px solid rgba(255,255,255,.18); border-radius: var(--apx-r);
+  box-shadow: 0 24px 50px -24px rgba(0,0,0,.65), inset 0 1px rgba(255,255,255,.22);
+}
+.apx-btn {
+  display: inline-block; font: 600 .95rem/1 var(--apx-body); letter-spacing: .04em; text-decoration: none; cursor: pointer;
+  padding: .85rem 1.6rem; border-radius: 999px; border: 0; color: var(--apx-bark);
+  background: linear-gradient(180deg, #f0c9a2, var(--apx-sand)); box-shadow: 0 10px 24px -10px rgba(227,180,136,.7);
+  transition: transform .18s ease, filter .18s ease;
+}
+.apx-btn:hover { transform: translateY(-2px); filter: brightness(1.06); }
+.apx-btn--ghost { background: transparent; color: var(--apx-cream); border: 1px solid rgba(255,255,255,.4); box-shadow: none; }
+.apx-hex { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.apx-grain::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 3; opacity: .22; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
+}

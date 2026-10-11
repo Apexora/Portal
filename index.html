@@ -1,16 +1,28 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-mood="portal">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0d1726" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#2a1420" />
     <title>Apexora · Portal</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet" />
+    <script>try{var k='apx-arr:portal';if(sessionStorage.getItem(k))document.documentElement.classList.add('apx-seen');else sessionStorage.setItem(k,1)}catch(e){}</script>
+    <link rel="stylesheet" href="/apexora-ui.css" />
   </head>
-  <body>
+  <body class="apx-grain">
+    <div class="paisaje" aria-hidden="true">
+      <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice">
+        <defs>
+          <radialGradient id="sol" cx="50%" cy="66%" r="55%"><stop offset="0" stop-color="#f3c9a0" stop-opacity=".95"/><stop offset=".35" stop-color="#e3b488" stop-opacity=".45"/><stop offset="1" stop-color="#e3b488" stop-opacity="0"/></radialGradient>
+          <linearGradient id="bruma" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b64e6f" stop-opacity="0"/><stop offset="1" stop-color="#e3b488" stop-opacity=".5"/></linearGradient>
+        </defs>
+        <rect width="1440" height="900" fill="url(#sol)"/>
+        <path d="M0 640 L110 590 L200 625 L330 540 L420 600 L520 560 L640 640 L760 570 L860 610 L980 520 L1090 600 L1200 560 L1320 620 L1440 580 V900 H0Z" fill="#8a4a67" opacity=".85"/>
+        <rect y="560" width="1440" height="200" fill="url(#bruma)"/>
+        <path d="M0 720 L90 690 L190 715 L300 650 L400 705 L520 670 L640 730 L760 680 L880 722 L1000 640 L1120 710 L1250 670 L1360 720 L1440 695 V900 H0Z" fill="#5a2d4f"/>
+        <path d="M0 800 L120 770 L240 795 L380 745 L520 790 L660 760 L800 805 L950 755 L1100 800 L1240 765 L1440 800 V900 H0Z" fill="#351b16"/>
+      </svg>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

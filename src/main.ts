@@ -6,11 +6,17 @@ import {
 } from './apexora-core.js';
 
 // ← Ajusta las rutas a donde viva cada página
+const ICONOS: Record<string, string> = {
+  tcg: '<rect x="4.5" y="5" width="10" height="14" rx="2" transform="rotate(-10 9.5 12)"/><rect x="9.5" y="5" width="10" height="14" rx="2" transform="rotate(9 14.5 12)"/>',
+  album: '<path d="M3.5 6C6 4.4 9.5 4.4 12 6c2.5-1.6 6-1.6 8.5 0v13c-2.5-1.6-6-1.6-8.5 0-2.5-1.6-6-1.6-8.5 0Z"/><path d="M12 6v13"/>',
+  sala: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.8"/><circle cx="12" cy="12" r="1.3"/>',
+  lore: '<path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/>',
+};
 const JUEGOS = [
-  { nombre: 'Cartas Alfa', desc: 'Duelo de cartas en línea', url: '/TCG/' },
-  { nombre: 'Álbum', desc: 'Colecciona y abre sobres', url: '/Album/' },
-  { nombre: 'Sala de Desafíos', desc: 'Retos y puntos', url: '/Desafio/' },
-  { nombre: 'Lore', desc: 'Historia y datos del universo', url: '/Lore/' },
+  { id: 'tcg', nombre: 'Cartas Alfa', desc: 'Duelo de cartas en línea', url: '/TCG/' },
+  { id: 'album', nombre: 'Álbum', desc: 'Colecciona y abre sobres', url: '/Album/' },
+  { id: 'sala', nombre: 'Sala de Desafíos', desc: 'Retos y puntos', url: '/Desafio/' },
+  { id: 'lore', nombre: 'Lore', desc: 'Historia y datos del universo', url: '/Lore/' },
 ];
 const AVATARES = ['🦊', '🐺', '🦉', '🐉', '🦁', '🐙', '🦅', '🐢'];
 
@@ -85,15 +91,19 @@ async function vistaPanel() {
     <button class="enlace" id="salir">Salir</button>
   </header>
   <main class="panel">
+    <section class="heroe">
+      <span class="apx-eyebrow">Bienvenido de vuelta</span>
+      <h1>${esc(p.nombre)}</h1>
+    </section>
     <section class="esencias" aria-label="Tus esencias">
       <div class="esencia azul"><span class="orbe"></span><b>${p.fragmentos.comun}</b><small>Esencia azul</small></div>
       <div class="esencia negra"><span class="orbe"></span><b>${p.fragmentos.rara}</b><small>Esencia negra</small></div>
       <div class="racha"><b>${p.streak.current}</b><small>${p.streak.current === 1 ? 'día seguido' : 'días seguidos'}</small></div>
     </section>
 
-    <section><h2>Juegos</h2>
-      <div class="juegos">${JUEGOS.map((j) =>
-        `<a class="juego" href="${esc(j.url)}"><b>${esc(j.nombre)}</b><small>${esc(j.desc)}</small></a>`).join('')}</div>
+    <section><h2>Elige un mundo</h2>
+      <div class="rejilla">${JUEGOS.map((j) =>
+        `<div class="hexw"><a class="hex m-${j.id}" href="${esc(j.url)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS[j.id]}</svg><b>${esc(j.nombre)}</b><small>${esc(j.desc)}</small><i>Entrar</i></a></div>`).join('')}</div>
     </section>
 
     <div class="dos">
