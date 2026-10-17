@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "id": "esc",
+    "archivo": "esc.jpg",
+    "nombre": "esc"
+  },
+  {
+    "id": "kar",
+    "archivo": "kar.jpg",
+    "nombre": "kar"
+  },
+  {
+    "id": "lum4",
+    "archivo": "lum4.jpg",
+    "nombre": "lum4"
+  },
+  {
+    "id": "nef",
+    "archivo": "nef.jpg",
+    "nombre": "nef"
+  },
+  {
+    "id": "zac",
+    "archivo": "zac.jpg",
+    "nombre": "zac"
+  },
+  {
+    "id": "zene",
+    "archivo": "zene.jpg",
+    "nombre": "zene"
+  }
+]
