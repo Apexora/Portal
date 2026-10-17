@@ -9,6 +9,7 @@ import {
 } from './apexora-core.js';
 import './fase1.css';
 import './perfil-chat.css';
+import { montarCometas } from './cometas';
 import { cristal, NOMBRE_CRISTAL } from './cristales.js';
 import { avisarLogros } from './logros.js';
 import { animarPanel, montarAurora, contar, luzDeFoco, entrarEvento, entrarLista, viajar, limpiar } from './fx';
@@ -32,6 +33,7 @@ const CLIMA: Record<string, [string, string]> = {   // [color alto, color bajo] 
 const EMOJIS = ['😀', '😂', '😍', '🥳', '😎', '🤔', '😭', '😡', '👍', '👏', '🔥', '💜', '✨', '🎉', '⚔️', '🃏'];
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
+montarCometas();
 
 const ENT: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => ENT[c]);
@@ -344,9 +346,13 @@ let miniTimer = 0;
 function ocultarMini() { clearTimeout(miniTimer); miniId = ''; if (mini) { mini.classList.remove('on'); mini.hidden = true; } }
 function posicionarMini(w: HTMLElement) {
   if (!mini) return;
-  const r = w.getBoundingClientRect(), ancho = mini.offsetWidth, alto = mini.offsetHeight;
-  let x = r.right + 10;
-  if (x + ancho > innerWidth - 8) x = Math.max(8, r.left - ancho - 10);
+  const r = w.getBoundingClientRect(), rej = (w.closest('.rejilla') ?? w).getBoundingClientRect();
+  const ancho = mini.offsetWidth, alto = mini.offsetHeight;
+  const izq = r.left + r.width / 2 < rej.left + rej.width / 2;     // se abre hacia afuera del panal, sin tapar otros mundos
+  let x = izq ? rej.left - ancho - 10 : rej.right + 10;
+  if (x < 8) x = rej.right + 10;
+  if (x + ancho > innerWidth - 8) x = rej.left - ancho - 10;
+  x = Math.min(Math.max(8, x), innerWidth - ancho - 8);
   const y = Math.min(Math.max(8, r.top + r.height / 2 - alto / 2), innerHeight - alto - 8);
   mini.style.left = `${x}px`; mini.style.top = `${y}px`;
 }

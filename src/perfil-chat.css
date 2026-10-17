@@ -129,3 +129,12 @@
 .mini-vacio { margin: .1rem 0 0; color: var(--suave); font-size: .85rem; }
 .mini small { display: block; margin-top: .7rem; color: var(--suave); font-size: .68rem; }
 @media (prefers-reduced-motion: reduce) { .mini { transition: none; } }
+
+/* ---------- Ajustes tras revisar la captura ---------- */
+.cometas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.panel { padding-top: 1.1rem; }                    /* los cristales ya no quedan pegados a la barra */
+.mini { width: 250px; }
+/* chat: los mensajes se acumulan abajo (junto a la caja) y los emojis se ven todos */
+.chat-msgs { display: flex; flex-direction: column; align-content: normal; }
+.chat-msgs > :first-child { margin-top: auto; }
+.chat-emojis { flex-wrap: wrap; overflow: visible; justify-content: center; padding: .6rem 0 .5rem; }
