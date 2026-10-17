@@ -17,19 +17,41 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 export const CATALOGO_LOGROS = {
+  // Los logros dan solo Sinfalita (y poca). La Odita ya no sale de logros.
   // Portal
-  primera_visita:       { nombre: "Primer paso",   desc: "Entraste a Apexora",              icono: "🌱", juego: "portal", premio: { comun: 10 } },
-  racha_3:              { nombre: "Constante",     desc: "3 días seguidos",                 icono: "🔥", juego: "portal", premio: { comun: 20 } },
-  racha_7:              { nombre: "Una semana",    desc: "7 días seguidos",                 icono: "⚡", juego: "portal", premio: { comun: 50, rara: 1 } },
-  racha_30:             { nombre: "Leyenda viva",  desc: "30 días seguidos",                icono: "👑", juego: "portal", premio: { comun: 200, rara: 5 } },
+  primera_visita:       { nombre: "Primer paso",   desc: "Entraste a Apexora",              icono: "🌱", juego: "portal", premio: { comun: 5 } },
+  racha_3:              { nombre: "Constante",     desc: "3 días seguidos",                 icono: "🔥", juego: "portal", premio: { comun: 10 } },
+  racha_7:              { nombre: "Una semana",    desc: "7 días seguidos",                 icono: "⚡", juego: "portal", premio: { comun: 20 } },
+  racha_30:             { nombre: "Leyenda viva",  desc: "30 días seguidos",                icono: "👑", juego: "portal", premio: { comun: 50 } },
   // Cartas Alfa
-  tcg_primera_victoria: { nombre: "Primer duelo",  desc: "Gana una partida de Cartas Alfa", icono: "⚔️", juego: "tcg",    premio: { comun: 25 } },
-  tcg_10_victorias:     { nombre: "Duelista",      desc: "10 victorias en Cartas Alfa",     icono: "🏆", juego: "tcg",    premio: { comun: 100, rara: 1 } },
+  tcg_primera_victoria: { nombre: "Primer duelo",  desc: "Gana una partida de Cartas Alfa", icono: "⚔️", juego: "tcg",    premio: { comun: 10 } },
+  tcg_10_victorias:     { nombre: "Duelista",      desc: "10 victorias en Cartas Alfa",     icono: "🏆", juego: "tcg",    premio: { comun: 30 } },
   // Sala de Desafíos
-  sala_primer_reto:     { nombre: "Desafiante",    desc: "Completa tu primer reto",         icono: "🎯", juego: "sala",   premio: { comun: 25 } },
+  sala_primer_reto:     { nombre: "Desafiante",    desc: "Completa tu primer reto",         icono: "🎯", juego: "sala",   premio: { comun: 10 } },
   // Álbum
-  album_primer_sobre:   { nombre: "Coleccionista", desc: "Abre tu primer sobre",            icono: "📖", juego: "album",  premio: { comun: 25 } },
+  album_primer_sobre:   { nombre: "Coleccionista", desc: "Abre tu primer sobre",            icono: "📖", juego: "album",  premio: { comun: 10 } },
 };
+
+/* Migración única: quita la Odita que los jugadores ya recibieron por logros (los premios de antes).
+   Solo cuenta logros desbloqueados antes de CORTE_ODITA — pon aquí la fecha en que publiques este cambio.
+   Si las rules de Firestore no dejan bajar fragmentos.rara, falla en silencio y se reintenta en la próxima visita. */
+const CORTE_ODITA = Date.UTC(2026, 9, 18);
+const ODITA_QUE_DABAN = { racha_7: 1, racha_30: 5, tcg_10_victorias: 1 };
+async function quitarOditaDeLogros() {
+  try {
+    const ref = refJugador();
+    await runTransaction(db, async (tx) => {
+      const x = (await tx.get(ref)).data();
+      if (!x || x.migr?.sinOditaLogros) return;
+      let n = 0;
+      for (const [id, o] of Object.entries(ODITA_QUE_DABAN)) {
+        const f = x.logros?.[id]?.fecha;
+        if (f && (f.toMillis?.() ?? 0) < CORTE_ODITA) n += o;
+      }
+      tx.update(ref, { "fragmentos.rara": Math.max(0, (x.fragmentos?.rara ?? 0) - n), "migr.sinOditaLogros": true });
+    });
+  } catch { /* se reintenta en la próxima visita */ }
+}
 
 const DOMINIO = "@apexora-sala.app";
 const COL = "apexora_players";
@@ -58,7 +80,7 @@ export function requerirUsuario(portal = "/Portal/") {
   return new Promise((res) => {
     const off = onAuthStateChanged(auth, async (u) => {
       off();
-      if (u?.email?.endsWith(DOMINIO)) { await registrarVisita(); res(u); }
+      if (u?.email?.endsWith(DOMINIO)) { await registrarVisita(); contarVisitaPagina(); res(u); }
       else location.href = portal + "?volver=" + encodeURIComponent(location.href);
     });
   });
@@ -88,6 +110,7 @@ export async function registrarVisita() {
     return { ...x, streak };
   });
   const r = d.streak.current;
+  await quitarOditaDeLogros();
   await desbloquearLogro("primera_visita");
   if (r >= 3)  await desbloquearLogro("racha_3");
   if (r >= 7)  await desbloquearLogro("racha_7");
@@ -285,4 +308,36 @@ export async function enviarMensaje(texto) {
 export function escucharChat(cb, n = 50) {
   const q = query(collection(db, COL_CHAT), orderBy("ts", "desc"), limit(n));
   return onSnapshot(q, (s) => cb(s.docs.map((d) => ({ id: d.id, ...d.data() })).reverse()), () => cb(null));
+}
+
+/* ---------- Visitas por página y datos para la pantallita del Portal ----------
+   Cada página que llame a requerirUsuario() suma 1 visita por sesión a stats.visitas.<juego> (según su ruta). */
+const PAGINAS = { "/tcg/": "tcg", "/album/": "album", "/desafio/": "sala", "/lore/": "lore" };
+async function contarVisitaPagina() {
+  try {
+    const ruta = location.pathname.toLowerCase();
+    const j = Object.entries(PAGINAS).find(([r]) => ruta.startsWith(r))?.[1]; if (!j) return;
+    const k = "apx-visita-" + j;
+    if (sessionStorage.getItem(k)) return;
+    sessionStorage.setItem(k, "1");
+    await sumarStat("visitas", j);
+  } catch { /* no es crítico */ }
+}
+/** Quién visita más una página: [{ uid, nombre, visitas }] */
+export async function topVisitas(juego, n = 3) {
+  const q = query(collection(db, COL), orderBy(`stats.visitas.${juego}`, "desc"), limit(n));
+  return (await getDocs(q)).docs.map((d) => ({ uid: d.id, nombre: d.data().nombre, visitas: d.data().stats?.visitas?.[juego] ?? 0 }));
+}
+/** Últimos eventos de todos los jugadores (una sola lectura) para armar rankings por juego. */
+export async function actividadReciente(n = 300) {
+  const q = query(collection(db, COL_ACT), orderBy("ts", "desc"), limit(n));
+  return (await getDocs(q)).docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+/** { uid: { name, avatar } } de perfiles públicos. */
+export async function perfilesPublicos(uids) {
+  const out = {};
+  await Promise.all([...new Set(uids)].map(async (u) => {
+    try { const s = await getDoc(doc(db, "apexora_profiles", u)); if (s.exists()) out[u] = { name: s.data().name, avatar: s.data().avatar }; } catch { /* sin perfil */ }
+  }));
+  return out;
 }
