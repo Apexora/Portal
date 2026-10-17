@@ -21,17 +21,8 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ENT[c]);
 /* ---------- Estilos (van dentro del módulo para no tocar el CSS de cada app) ---------- */
 const css = document.createElement("style");
 css.textContent = `
-.apx-hud {
-  position: fixed;
-  z-index: 2147482000;
-  top: var(--apx-hud-top, calc(env(safe-area-inset-top, 0px) + 12px));
-  right: auto;
-  bottom: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  font: 500 .9rem/1.2 var(--apx-body, system-ui, sans-serif);
-  color: var(--apx-cream, #f7ece0);
-}
+.apx-hud{position:fixed;z-index:2147482000;top:var(--apx-hud-top,calc(env(safe-area-inset-top,0px) + 12px));right:var(--apx-hud-right,12px);bottom:var(--apx-hud-bottom,auto);left:var(--apx-hud-left,auto);
+  font:500 .9rem/1.2 var(--apx-body,system-ui,sans-serif);color:var(--apx-cream,#f7ece0)}
 .apx-hud *{box-sizing:border-box}
 .apx-hud__pill{all:unset;cursor:pointer;display:flex;align-items:center;gap:.7rem;padding:.42rem .8rem .42rem .55rem;border-radius:999px;position:relative;
   background:linear-gradient(160deg,rgba(255,255,255,.18),rgba(255,255,255,.06)),rgba(28,12,20,.62);-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);

@@ -64,3 +64,68 @@
   .izq .actividad { grid-area: auto; }
   .izq .feed { max-height: 330px; }
 }
+
+/* ---------- Mejor uso del espacio ---------- */
+.heroe { padding-top: 1.2rem; }
+.heroe h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); }
+.panel { gap: 1.6rem; }
+
+/* Cristales en vertical (tarjetas compactas) cuando comparten fila con el título */
+@media (min-width: 760px) {
+  .esencias { gap: .6rem; }
+  .esencias > div { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: .8rem .3rem; row-gap: .15rem; }
+  .esencias small, .racha small { grid-column: 1; }
+  .cristal { grid-row: auto; width: 2rem; height: 2.7rem; }
+  .racha { text-align: center; }
+  .esencia b, .racha b { font-size: clamp(1.7rem, 2.4vw, 2.2rem); }
+}
+
+/* Tableta: dos columnas en vez de una sola larga */
+@media (min-width: 760px) and (max-width: 1179.98px) {
+  .barra { max-width: 1100px; }
+  .panel {
+    max-width: 1100px; align-items: start; column-gap: 1.6rem; row-gap: 1.6rem;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    grid-template-areas: "heroe esen" "mundos izq" "dos dos";
+  }
+  .heroe { grid-area: heroe; align-self: center; }
+  .esencias { grid-area: esen; }
+  .mundos { grid-area: mundos; container-type: inline-size; }
+  .rejilla { --w: min(250px, calc(100cqw / 2.5)); }
+  .izq { display: grid; grid-area: izq; gap: 1.6rem; align-content: start; }
+  .dos { grid-area: dos; }
+}
+
+/* Escritorio: el título y los cristales comparten fila, y todo sube */
+@media (min-width: 1180px) {
+  .panel { grid-template-areas: "heroe heroe esen" "act mundos lado"; }
+  .heroe { align-self: center; }
+}
+@media (min-width: 1700px) {
+  .barra { max-width: 1680px; }
+  .panel { max-width: 1680px; grid-template-columns: minmax(320px, 380px) minmax(0, 1fr) minmax(320px, 380px); }
+  .rejilla { --w: min(300px, calc(100cqw / 2.5)); }
+  .izq .feed { max-height: 400px; }
+  .chat-msgs { height: 320px; }
+}
+
+/* ---------- Pantallita de un mundo (al pasar el mouse) ---------- */
+.mini { position: fixed; z-index: 1000; width: 270px; padding: .9rem 1rem 1rem; border-radius: 18px; pointer-events: none;
+  background: linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.04)), rgba(24,10,18,.94);
+  border: 1px solid rgba(255,255,255,.22); box-shadow: 0 24px 50px -16px rgba(0,0,0,.75);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  opacity: 0; transform: translateX(-6px) scale(.97); transition: opacity .18s, transform .18s; }
+.mini[hidden] { display: none; }
+.mini.on { opacity: 1; transform: none; }
+.mini-cab { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; color: var(--apx-sand); }
+.mini-cab svg { width: 1.3rem; height: 1.3rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.mini-cab b { font: 400 1.25rem/1 var(--apx-display); }
+.mini h4 { margin: .7rem 0 .3rem; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--apx-cream); opacity: .9; }
+.mini ol { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.mini li { display: flex; align-items: center; gap: .55rem; }
+.mini li .av { display: grid; place-items: center; flex: none; width: 1.8rem; height: 1.8rem; border-radius: 50%; overflow: hidden; background: rgba(255,255,255,.16); font-size: .95rem; }
+.mini li .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+.mini li b { color: var(--apx-sand); font-variant-numeric: tabular-nums; }
+.mini-vacio { margin: .1rem 0 0; color: var(--suave); font-size: .85rem; }
+.mini small { display: block; margin-top: .7rem; color: var(--suave); font-size: .68rem; }
+@media (prefers-reduced-motion: reduce) { .mini { transition: none; } }

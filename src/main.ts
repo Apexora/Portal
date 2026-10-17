@@ -5,6 +5,7 @@ import {
   registrarVisita, obtenerPerfil, ranking, CATALOGO_LOGROS,
   escucharActividad, escucharFragmentos, describirActividad, NOMBRE_JUEGO,
   cargarAvatares, avatarHTML, opcionesAvatar, cambiarAvatar, enviarMensaje, escucharChat,
+  topVisitas, actividadReciente, perfilesPublicos,
 } from './apexora-core.js';
 import './fase1.css';
 import './perfil-chat.css';
@@ -158,7 +159,7 @@ async function vistaPanel() {
 
     <section class="mundos"><h2>Elige un mundo</h2>
       <div class="rejilla">${JUEGOS.map((j) =>
-        `<div class="hexw"><a class="hex m-${j.id}" href="${esc(j.url)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS[j.id]}</svg><b>${esc(j.nombre)}</b><small>${esc(j.desc)}</small><i>Entrar</i></a></div>`).join('')}</div>
+        `<div class="hexw" data-j="${j.id}"><a class="hex m-${j.id}" href="${esc(j.url)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS[j.id]}</svg><b>${esc(j.nombre)}</b><small>${esc(j.desc)}</small><i>Entrar</i></a></div>`).join('')}</div>
     </section>
 
     <div class="izq">
@@ -202,6 +203,8 @@ async function vistaPanel() {
   contar(app.querySelector('.esencia.sinfalita b'), p.fragmentos.comun);
   contar(app.querySelector('.esencia.odita b'), p.fragmentos.rara);
   contar(app.querySelector('.racha b'), p.streak.current);
+
+  activarMini(app);
 
   // Transición al entrar a un mundo
   app.querySelectorAll<HTMLAnchorElement>('a.hex').forEach((a) => {
@@ -298,6 +301,83 @@ function detenerFeed() {
   vistos.clear(); primeraCarga = true;
 }
 
+/* ---------- Pantallita al pasar el mouse por un mundo ---------- */
+type Fila = { uid: string; nombre: string; avatar: string; n: number };
+type DatosMini = { t: number; mejores: Fila[]; visitas: Fila[] };
+const cacheMini: Record<string, DatosMini> = {};
+let actCache: { t: number; evs: any[] } | null = null;
+const MEJOR: Record<string, [string, string]> = {   // [título, qué se cuenta]
+  tcg: ['Más victorias', 'victorias'], sala: ['Más retos superados', 'retos'], album: ['Más sobres abiertos', 'sobres'],
+};
+async function datosMini(id: string): Promise<DatosMini> {
+  const c = cacheMini[id]; if (c && Date.now() - c.t < 60000) return c;
+  const mejores: Fila[] = [];
+  if (MEJOR[id]) {
+    if (!actCache || Date.now() - actCache.t > 60000) actCache = { t: Date.now(), evs: await actividadReciente(300) };
+    const cuenta = new Map<string, Fila>();
+    for (const e of actCache.evs) {
+      const d = e.datos ?? {};
+      if (e.juego !== id) continue;
+      const vale = (id === 'tcg' && e.tipo === 'duelo') || (id === 'sala' && e.tipo === 'reto' && d.gano) || (id === 'album' && e.tipo === 'sobre');
+      if (!vale) continue;
+      const f = cuenta.get(e.uid) ?? { uid: e.uid, nombre: String(e.nombre ?? 'Alguien'), avatar: String(e.avatar ?? '🙂'), n: 0 };
+      f.n++; cuenta.set(e.uid, f);
+    }
+    mejores.push(...[...cuenta.values()].sort((a, b) => b.n - a.n).slice(0, 3));
+  }
+  let visitas: Fila[] = [];
+  try {
+    const v = await topVisitas(id, 3);
+    const pf = (await perfilesPublicos(v.map((x: any) => x.uid))) as Record<string, { name?: string; avatar?: string }>;
+    visitas = v.filter((x: any) => x.visitas > 0).map((x: any) => ({
+      uid: x.uid, nombre: String(pf[x.uid]?.name ?? x.nombre ?? 'Alguien'), avatar: String(pf[x.uid]?.avatar ?? '🙂'), n: x.visitas }));
+  } catch { /* sin permiso o sin índice: se muestra vacío */ }
+  return (cacheMini[id] = { t: Date.now(), mejores, visitas });
+}
+const filasMini = (fs: Fila[]) => fs.length
+  ? `<ol>${fs.map((f) => `<li><span class="av">${avatarHTML(f.avatar, 'av-img')}</span><span class="nm">${esc(f.nombre)}</span><b>${f.n}</b></li>`).join('')}</ol>`
+  : '<p class="mini-vacio">Aún nadie. ¡Sé el primero! ✨</p>';
+
+let mini: HTMLDivElement | null = null;
+let miniId = '';
+let miniTimer = 0;
+function ocultarMini() { clearTimeout(miniTimer); miniId = ''; if (mini) { mini.classList.remove('on'); mini.hidden = true; } }
+function posicionarMini(w: HTMLElement) {
+  if (!mini) return;
+  const r = w.getBoundingClientRect(), ancho = mini.offsetWidth, alto = mini.offsetHeight;
+  let x = r.right + 10;
+  if (x + ancho > innerWidth - 8) x = Math.max(8, r.left - ancho - 10);
+  const y = Math.min(Math.max(8, r.top + r.height / 2 - alto / 2), innerHeight - alto - 8);
+  mini.style.left = `${x}px`; mini.style.top = `${y}px`;
+}
+async function mostrarMini(w: HTMLElement) {
+  const id = w.dataset.j!, j = JUEGOS.find((x) => x.id === id)!;
+  if (!mini) { mini = document.createElement('div'); mini.className = 'mini'; mini.setAttribute('role', 'tooltip'); document.body.appendChild(mini); }
+  miniId = id;
+  const cab = `<div class="mini-cab"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS[id]}</svg><b>${esc(j.nombre)}</b></div>`;
+  mini.innerHTML = cab + '<p class="mini-vacio">Cargando…</p>';
+  mini.hidden = false; posicionarMini(w); requestAnimationFrame(() => mini?.classList.add('on'));
+  const d = await datosMini(id).catch(() => null);
+  if (!mini || miniId !== id) return;
+  mini.innerHTML = cab
+    + (MEJOR[id] ? `<h4>🏆 ${MEJOR[id][0]}</h4>${filasMini(d?.mejores ?? [])}` : '')
+    + `<h4>👣 Visitan más esta página</h4>${filasMini(d?.visitas ?? [])}`
+    + (MEJOR[id] ? '<small>Según la actividad reciente</small>' : '');
+  posicionarMini(w);
+}
+function activarMini(raiz: HTMLElement) {
+  raiz.querySelectorAll<HTMLElement>('.hexw[data-j]').forEach((w) => {
+    w.addEventListener('pointerenter', (e) => {
+      if (e.pointerType !== 'mouse' || innerWidth < 760) return;
+      clearTimeout(miniTimer); miniTimer = window.setTimeout(() => { void mostrarMini(w); }, 180);
+    });
+    w.addEventListener('pointerleave', ocultarMini);
+    w.addEventListener('focusin', () => { if (innerWidth >= 760) void mostrarMini(w); });
+    w.addEventListener('focusout', ocultarMini);
+    w.addEventListener('click', ocultarMini);
+  });
+}
+
 /* ---------- Chat libre ---------- */
 let offChat: (() => void) | null = null;
 let ultimoMsg = 0;
@@ -337,7 +417,7 @@ function iniciarChat(uid: string) {
     catch { err.textContent = 'No se pudo enviar el mensaje. Inténtalo de nuevo.'; inp.value = t; }
   };
 }
-function detener() { detenerFeed(); offFrag?.(); offFrag = null; offChat?.(); offChat = null; limpiar(); }
+function detener() { ocultarMini(); detenerFeed(); offFrag?.(); offFrag = null; offChat?.(); offChat = null; limpiar(); }
 
 /* ---------- Arranque ---------- */
 let ocupado = false;
