@@ -1,0 +1,5 @@
+Imágenes de perfil de Apexora.
+- Sube aquí tus imágenes (png, jpg, webp, gif, avif o svg), cuadradas (ej. 256x256).
+- El nombre del archivo SIN extensión es el id que se guarda en el perfil: de 1 a 8 letras, números, _ o -  (ej. zorro.png, a01.webp).
+- No cambies el nombre de un archivo ya usado: los jugadores que lo eligieron lo perderían.
+- avatares.json se genera solo al ejecutar `npm run dev` o `npm run build`.
