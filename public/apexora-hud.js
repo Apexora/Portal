@@ -4,7 +4,7 @@
    :root { --apx-hud-top: 12px; --apx-hud-right: 12px; --apx-hud-bottom: auto; --apx-hud-left: auto; --apx-toast-top: 12px; } */
 import { cristal } from "./apexora-cristales.js";
 import { avisarLogros } from "./apexora-logros.js";
-import { auth, CATALOGO_LOGROS, escucharFragmentos, escucharActividad, describirActividad, NOMBRE_JUEGO, onSesion } from "./apexora-core.js";
+import { auth, CATALOGO_LOGROS, escucharFragmentos, escucharActividad, escucharPerfil, cargarAvatares, avatarHTML, describirActividad, NOMBRE_JUEGO, onSesion } from "./apexora-core.js";
 
 const omitir = window.top !== window || /[?&]embed/.test(location.search) || window.__APX_HUD__;
 if (!omitir) {
@@ -35,6 +35,10 @@ css.textContent = `
 .apx-hud__it.sinfalita .cristal{filter:drop-shadow(0 0 5px rgba(61,240,238,.8))}
 .apx-hud__it.odita .cristal{filter:drop-shadow(0 0 .5px rgba(190,165,240,.95)) drop-shadow(0 0 7px rgba(150,110,210,.55))}
 .apx-hud__it.racha .fl{font-size:1rem;line-height:1}
+.apx-hud__me{display:grid;place-items:center;width:1.9rem;height:1.9rem;flex:none;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);font-size:1.05rem}
+.apx-hud__me:empty{display:none}
+.apx-hud .apx-av{width:100%;height:100%;object-fit:cover;display:block}
+.apx-hud .apx-av--emoji{display:grid;place-items:center}
 .apx-hud__sep{width:1px;height:1.1rem;background:rgba(255,255,255,.22)}
 .apx-hud__panel{position:absolute;top:calc(100% + 10px);right:0;width:min(330px,calc(100vw - 24px));padding:.9rem .95rem;border-radius:20px;transform-origin:100% 0;
   background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,.05)),rgba(28,12,20,.82);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
@@ -46,7 +50,7 @@ css.textContent = `
 .apx-hud__panel h3{margin:0 0 .6rem;font:400 1.05rem/1 var(--apx-display,Georgia,serif);color:var(--apx-sand,#e3b488);letter-spacing:.03em}
 .apx-hud__feed{list-style:none;margin:0;padding:0;display:grid;gap:.5rem;max-height:46vh;overflow:auto}
 .apx-hud__feed li{display:flex;gap:.55rem;align-items:flex-start;font-size:.82rem;line-height:1.3}
-.apx-hud__feed .av{display:grid;place-items:center;width:1.7rem;height:1.7rem;flex:none;border-radius:50%;background:rgba(255,255,255,.16);font-size:.95rem}
+.apx-hud__feed .av{overflow:hidden;display:grid;place-items:center;width:1.7rem;height:1.7rem;flex:none;border-radius:50%;background:rgba(255,255,255,.16);font-size:.95rem}
 .apx-hud__feed small{display:block;opacity:.65;font-size:.72rem}
 .apx-hud__more{display:inline-block;margin-top:.7rem;color:var(--apx-sand,#e3b488);font-size:.8rem;text-decoration:underline;text-underline-offset:3px}
 .apx-hud__vacio{opacity:.7;font-size:.82rem}
@@ -66,7 +70,8 @@ const hud = document.createElement("div");
 hud.className = "apx-hud";
 hud.hidden = true;
 hud.innerHTML = `
-  <button class="apx-hud__pill" type="button" aria-expanded="false" aria-label="Tus cristales y la actividad de los jugadores">
+  <button class="apx-hud__pill" type="button" aria-expanded="false" aria-label="Tu perfil, tus cristales y la actividad de los jugadores">
+    <span class="apx-hud__me"></span>
     <span class="apx-hud__it sinfalita" title="Sinfalita"><i class="apx-hud__cr">${cristal("sinfalita")}</i><b data-k="comun">0</b></span>
     <span class="apx-hud__it odita" title="Odita"><i class="apx-hud__cr">${cristal("odita")}</i><b data-k="rara">0</b></span>
     <span class="apx-hud__sep"></span>
@@ -87,6 +92,10 @@ const panel = hud.querySelector(".apx-hud__panel");
 const feed = hud.querySelector(".apx-hud__feed");
 const el = { comun: hud.querySelector('[data-k="comun"]'), rara: hud.querySelector('[data-k="rara"]'), racha: hud.querySelector('[data-k="racha"]') };
 const val = { comun: 0, rara: 0, racha: 0 };
+const yo = hud.querySelector(".apx-hud__me");
+let perfil = null;
+const pintarYo = () => { if (perfil) { yo.innerHTML = avatarHTML(perfil.avatar); yo.title = perfil.name || ""; } };
+const offPerfil = escucharPerfil((p) => { perfil = p; cargarAvatares().then(pintarYo); });
 
 /* ---------- Efectos ---------- */
 function contar(k, hasta) {
@@ -153,7 +162,7 @@ function aplicar(n, cubierto = {}) {
   }
   try { localStorage.setItem(GUARDA, JSON.stringify(n)); } catch { /* ignorar */ }
 }
-onSesion((u) => { if (!u) { hud.hidden = true; offFrag(); } });
+onSesion((u) => { if (!u) { hud.hidden = true; offFrag(); offPerfil(); } });
 
 /* ---------- Panel de actividad (solo escucha cuando lo abres) ---------- */
 let offAct = null, abierto = false;
@@ -162,7 +171,7 @@ const hace = (ms) => {
   return m < 1 ? "ahora" : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
 };
 function pintar(evs) {
-  feed.innerHTML = evs.length ? evs.slice(0, 8).map((e) => `<li><span class="av">${esc(e.avatar || "🙂")}</span><div>${esc(describirActividad(e))}<small>${esc(NOMBRE_JUEGO[e.juego] || "Apexora")} · ${hace(e.ts?.toMillis?.() ?? Date.now())}</small></div></li>`).join("")
+  feed.innerHTML = evs.length ? evs.slice(0, 8).map((e) => `<li><span class="av">${avatarHTML(e.avatar)}</span><div>${esc(describirActividad(e))}<small>${esc(NOMBRE_JUEGO[e.juego] || "Apexora")} · ${hace(e.ts?.toMillis?.() ?? Date.now())}</small></div></li>`).join("")
     : `<li class="apx-hud__vacio">Todavía no hay actividad.</li>`;
 }
 function alternar(abrir) {
@@ -172,7 +181,7 @@ function alternar(abrir) {
     hud.classList.toggle("arriba", r.top > innerHeight / 2);
     hud.classList.toggle("izq", r.left < innerWidth / 2);
     panel.hidden = false;
-    if (!offAct) offAct = escucharActividad(pintar, 8);
+    if (!offAct) { offAct = () => {}; cargarAvatares().then(() => { offAct = escucharActividad(pintar, 8); }); }
     if (anima) gsap.fromTo(panel, { opacity: 0, scale: .9, y: -8 }, { opacity: 1, scale: 1, y: 0, duration: .35, ease: "back.out(1.5)" });
   } else if (anima) gsap.to(panel, { opacity: 0, scale: .94, duration: .2, onComplete: () => { panel.hidden = true; } });
   else panel.hidden = true;

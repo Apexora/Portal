@@ -1,0 +1,66 @@
+/* Perfil estilo Netflix + chat libre. Se carga después de fase1.css. */
+.av { overflow: hidden; }
+.av-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.apx-av--emoji { display: grid; place-items: center; }
+.av-btn { cursor: pointer; padding: 0; border: 2px solid rgba(255,255,255,.4); transition: border-color .2s, transform .2s; }
+.av-btn:hover { border-color: #fff; transform: scale(1.08); }
+
+/* Selector de imágenes (registro y edición) */
+.av-rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: .6rem; max-height: 260px; overflow: auto; padding: .35rem; }
+.av-op { display: block; }
+.av-op input { position: absolute; opacity: 0; }
+.av-tile { display: grid; place-items: center; aspect-ratio: 1; border-radius: 10px; overflow: hidden; font-size: 2rem; cursor: pointer;
+  border: 3px solid transparent; background: rgba(20,8,14,.35); transition: transform .18s, border-color .18s, box-shadow .18s; }
+.av-op:hover .av-tile { transform: scale(1.08); }
+.av-op input:checked + .av-tile { border-color: #fff; box-shadow: 0 0 0 2px var(--apx-sand), 0 12px 24px -10px rgba(0,0,0,.7); }
+.av-op input:focus-visible + .av-tile { outline: 2px solid var(--apx-sand); outline-offset: 2px; }
+
+/* ¿Quién juega? */
+.quien-juega { max-width: 760px; margin: 0 auto; padding: 14vh 1.25rem 3rem; text-align: center; display: grid; justify-items: center; gap: 1.6rem; }
+.quien-juega h1 { font-size: clamp(2.4rem, 9vw, 4.2rem); color: var(--apx-sand); line-height: 1.05; text-shadow: 0 6px 40px rgba(0,0,0,.45); }
+.quien-juega .sub { margin: 0; }
+.perfil { all: unset; cursor: pointer; display: grid; justify-items: center; gap: .8rem; }
+.perfil b { font-weight: 500; font-size: 1.15rem; color: var(--suave); transition: color .2s; }
+.av-tile.grande { width: min(170px, 40vw); font-size: 4rem; }
+.perfil:hover .av-tile, .perfil:focus-visible .av-tile { transform: scale(1.1); border-color: #fff; }
+.perfil:hover b, .perfil:focus-visible b { color: #fff; }
+.perfil:focus-visible { outline: none; }
+.btn-ghost { cursor: pointer; background: transparent; border: 1px solid rgba(255,255,255,.45); border-radius: 4px; padding: .6rem 1.4rem; letter-spacing: .16em; text-transform: uppercase; font-size: .8rem; transition: border-color .2s, background .2s; }
+.btn-ghost:hover { border-color: #fff; background: rgba(255,255,255,.1); }
+.quien-juega.editar form { width: 100%; display: grid; gap: 1rem; }
+.quien-juega.editar .av-rejilla { max-height: 48vh; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+.acciones { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; }
+.acciones .primario { padding: .8rem 2rem; }
+
+/* Chat libre */
+.chat { padding: 1.2rem; border-radius: 24px; border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.05)), rgba(28,12,20,.4);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.chat-cab { display: flex; justify-content: space-between; align-items: center; gap: .6rem; margin-bottom: .8rem; }
+.chat-cab h2 { margin: 0; }
+.vivo { font-size: .72rem; font-weight: 600; letter-spacing: .08em; color: #8ff8f4; }
+.chat-msgs { display: grid; align-content: start; gap: .55rem; height: 270px; overflow: auto; padding-right: .3rem; scrollbar-width: thin; scrollbar-color: rgba(227,180,136,.5) transparent; }
+.chat-msgs .vacio { color: var(--suave); text-align: center; padding: 2rem 0; }
+.msg { display: flex; gap: .6rem; align-items: flex-start; }
+.msg .av { flex: none; width: 2rem; height: 2rem; font-size: 1.05rem; }
+.bub { min-width: 0; padding: .45rem .75rem; border-radius: 4px 16px 16px 16px; background: rgba(255,255,255,.1); }
+.msg.mio .bub { background: rgba(227,180,136,.22); }
+.quien-msg { display: flex; align-items: baseline; gap: .5rem; font-size: .8rem; }
+.quien-msg time { color: var(--suave); font-size: .68rem; }
+.bub p { margin: .1rem 0 0; overflow-wrap: anywhere; line-height: 1.35; }
+.chat-emojis { display: flex; gap: .2rem; overflow-x: auto; padding: .6rem 0 .4rem; scrollbar-width: none; }
+.emo { flex: none; cursor: pointer; background: none; border: 0; font-size: 1.35rem; line-height: 1; padding: .2rem .3rem; border-radius: 8px; transition: transform .15s, background .15s; }
+.emo:hover { transform: scale(1.25); background: rgba(255,255,255,.12); }
+.chat-form { display: flex; gap: .5rem; }
+.chat-form input { flex: 1; min-width: 0; }
+.chat-form .primario { padding: .7rem 1.3rem; }
+.chat .err { min-height: 0; margin-top: .3rem; }
+
+/* Orden en pantallas chicas: cristales → chat → mundos → actividad → logros */
+.izq { display: contents; }
+.heroe { order: 0; } .esencias { order: 1; } .chat { order: 2; } .mundos { order: 3; } .actividad { order: 4; } .dos { order: 5; }
+@media (min-width: 1180px) {
+  .izq { display: grid; grid-area: act; gap: 1.6rem; align-content: start; }
+  .izq .actividad { grid-area: auto; }
+  .izq .feed { max-height: 330px; }
+}

@@ -49,7 +49,7 @@ export function animarPanel(root: HTMLElement) {
       .from('.hexw', { scale: 0.4, rotate: -14, opacity: 0, duration: 1.1, stagger: 0.12, ease: 'elastic.out(1,.6)', transformOrigin: '50% 50%', clearProps: 'transform' }, '-=0.3');
 
     // Aparecen al hacer scroll
-    gsap.utils.toArray<HTMLElement>('.dos > section, .actividad').forEach((s) => {
+    gsap.utils.toArray<HTMLElement>('.dos > section, .actividad, .chat').forEach((s) => {
       gsap.from(s, { y: 50, opacity: 0, duration: 0.8, ease: 'power3.out', scrollTrigger: { trigger: s, start: 'top 88%', once: true } });
     });
     gsap.utils.toArray<HTMLElement>('.logro').forEach((l, i) => {

@@ -4,8 +4,10 @@ import {
   auth, db, onSesion, iniciarSesion, registrar, cerrarSesion,
   registrarVisita, obtenerPerfil, ranking, CATALOGO_LOGROS,
   escucharActividad, escucharFragmentos, describirActividad, NOMBRE_JUEGO,
+  cargarAvatares, avatarHTML, opcionesAvatar, cambiarAvatar, enviarMensaje, escucharChat,
 } from './apexora-core.js';
 import './fase1.css';
+import './perfil-chat.css';
 import { cristal, NOMBRE_CRISTAL } from './cristales.js';
 import { avisarLogros } from './logros.js';
 import { animarPanel, montarAurora, contar, luzDeFoco, entrarEvento, entrarLista, viajar, limpiar } from './fx';
@@ -26,7 +28,7 @@ const JUEGOS = [
 const CLIMA: Record<string, [string, string]> = {   // [color alto, color bajo] de cada mundo (los mismos de apexora-ui.css)
   tcg: ['#d56e6f', '#b10821'], album: ['#e3b488', '#a99441'], sala: ['#5fd0c8', '#069494'], lore: ['#a9c4a7', '#759773'],
 };
-const AVATARES = ['🦊', '🐺', '🦉', '🐉', '🦁', '🐙', '🦅', '🐢'];
+const EMOJIS = ['😀', '😂', '😍', '🥳', '😎', '🤔', '😭', '😡', '👍', '👏', '🔥', '💜', '✨', '🎉', '⚔️', '🃏'];
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -44,8 +46,53 @@ function msgErr(e: unknown): string {
   return 'No se pudo completar. Inténtalo de nuevo.';
 }
 
+/* ---------- Perfil estilo Netflix ---------- */
+function rejillaAvatar(sel: string): string {
+  return `<div class="av-rejilla" role="radiogroup">${opcionesAvatar().map((a: { id: string; nombre?: string }, i: number) =>
+    `<label class="av-op" title="${esc(a.nombre ?? '')}"><input type="radio" name="a" value="${esc(a.id)}" ${a.id === sel || (!sel && i === 0) ? 'checked' : ''}><span class="av-tile">${avatarHTML(a.id, 'av-img')}</span></label>`).join('')}</div>`;
+}
+async function datosPerfil() {
+  await cargarAvatares();
+  const s = await getDoc(doc(db, 'apexora_profiles', auth.currentUser!.uid));
+  const d = s.exists() ? s.data() : {};
+  return { nombre: String(d.name ?? auth.currentUser!.email!.split('@')[0]), avatar: String(d.avatar ?? '🙂') };
+}
+/** «¿Quién juega?»: una vez por sesión, antes del panel. */
+function vistaQuien(nombre: string, avatar: string) {
+  detener();
+  app.innerHTML = `<main class="quien-juega">
+    <h1>¿Quién juega?</h1>
+    <div class="perfiles"><button class="perfil" id="entrar"><span class="av-tile grande">${avatarHTML(avatar, 'av-img')}</span><b>${esc(nombre)}</b></button></div>
+    <button class="btn-ghost" id="editar">✏️ Editar perfil</button>
+  </main>`;
+  app.querySelector<HTMLButtonElement>('#entrar')!.onclick = () => { vistaPanel(); };
+  app.querySelector<HTMLButtonElement>('#editar')!.onclick = () => vistaEditar(nombre, avatar, (a) => vistaQuien(nombre, a));
+}
+function vistaEditar(nombre: string, avatar: string, volver: (a: string) => void) {
+  detener();
+  app.innerHTML = `<main class="quien-juega editar">
+    <span class="apx-eyebrow">Editar perfil</span>
+    <h1>Elige tu imagen</h1>
+    <p class="sub">${esc(nombre)} · se verá en todas las plataformas de Apexora</p>
+    <form id="fa">${rejillaAvatar(avatar)}
+      <p class="err" id="erra" role="alert"></p>
+      <div class="acciones"><button class="primario">Guardar</button><button type="button" class="btn-ghost" id="cancelar">Cancelar</button></div>
+    </form></main>`;
+  const f = app.querySelector<HTMLFormElement>('#fa')!;
+  app.querySelector<HTMLButtonElement>('#cancelar')!.onclick = () => volver(avatar);
+  f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const nuevo = String(new FormData(f).get('a') ?? avatar), btn = f.querySelector<HTMLButtonElement>('.primario')!;
+    if (nuevo === avatar) { volver(avatar); return; }
+    btn.disabled = true;
+    try { await cambiarAvatar(nuevo); volver(nuevo); }
+    catch { app.querySelector<HTMLElement>('#erra')!.textContent = 'No se pudo guardar. Revisa que las reglas de Firebase permitan editar tu perfil.'; btn.disabled = false; }
+  };
+}
+
 /* ---------- Acceso ---------- */
-function vistaLogin(crear = false) {
+async function vistaLogin(crear = false) {
+  if (crear) await cargarAvatares();
   app.innerHTML = `
   <main class="acceso">
     <h1>Apexora</h1>
@@ -53,8 +100,7 @@ function vistaLogin(crear = false) {
     <form id="f">
       <label>Usuario<input name="u" autocomplete="username" required minlength="3" maxlength="20"></label>
       <label>Clave<input name="c" type="password" autocomplete="${crear ? 'new-password' : 'current-password'}" required minlength="6"></label>
-      ${crear ? `<fieldset><legend>Elige tu avatar</legend><div class="avatares">${AVATARES.map((a, i) =>
-        `<label><input type="radio" name="a" value="${a}" ${i === 0 ? 'checked' : ''}><span>${a}</span></label>`).join('')}</div></fieldset>` : ''}
+      ${crear ? `<fieldset><legend>Elige tu imagen de perfil</legend>${rejillaAvatar('')}</fieldset>` : ''}
       <p class="err" id="err" role="alert"></p>
       <button class="primario">${crear ? 'Crear cuenta' : 'Entrar'}</button>
     </form>
@@ -84,6 +130,7 @@ async function vistaPanel() {
   ]);
   if (!p) { app.innerHTML = '<p class="cargando">No se pudo cargar tu perfil. Recarga la página.</p>'; return; }
   const avatar = prof.exists() ? prof.data().avatar : '🙂';
+  await cargarAvatares();
 
   const logros = Object.entries(CATALOGO_LOGROS as Record<string, any>).map(([id, l]) => {
     const ok = !!p.logros?.[id];
@@ -95,7 +142,7 @@ async function vistaPanel() {
 
   app.innerHTML = `
   <header class="barra">
-    <span class="quien"><span class="av">${esc(avatar)}</span>${esc(p.nombre)}</span>
+    <span class="quien"><button class="av av-btn" id="miperfil" title="Editar perfil" aria-label="Editar perfil">${avatarHTML(avatar, 'av-img')}</button>${esc(p.nombre)}</span>
     <button class="enlace" id="salir">Salir</button>
   </header>
   <main class="panel">
@@ -114,6 +161,18 @@ async function vistaPanel() {
         `<div class="hexw"><a class="hex m-${j.id}" href="${esc(j.url)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONOS[j.id]}</svg><b>${esc(j.nombre)}</b><small>${esc(j.desc)}</small><i>Entrar</i></a></div>`).join('')}</div>
     </section>
 
+    <div class="izq">
+    <section class="chat apx-spot" aria-label="Chat libre de los jugadores">
+      <div class="chat-cab"><h2>Chat libre 💬</h2><span class="vivo">● en vivo</span></div>
+      <ul class="chat-msgs" id="chat" aria-live="polite"><li class="vacio">Cargando mensajes…</li></ul>
+      <div class="chat-emojis" role="group" aria-label="Emojis">${EMOJIS.map((e) => `<button type="button" class="emo" data-e="${e}" aria-label="Emoji ${e}">${e}</button>`).join('')}</div>
+      <form class="chat-form" id="chatf" autocomplete="off">
+        <input name="m" maxlength="200" placeholder="Deja un mensaje a los demás jugadores… 😄" aria-label="Mensaje">
+        <button class="primario">Enviar</button>
+      </form>
+      <p class="err" id="chaterr" role="alert"></p>
+    </section>
+
     <section class="actividad apx-spot" aria-label="Actividad de los jugadores">
       <div class="act-cab">
         <h2>Actividad</h2>
@@ -126,6 +185,7 @@ async function vistaPanel() {
       </div>
       <ul class="feed" id="feed"><li class="vacio">Cargando actividad…</li></ul>
     </section>
+    </div>
 
     <div class="dos">
       <section class="apx-spot"><h2>Logros</h2><ul class="logros">${logros}</ul></section>
@@ -134,6 +194,8 @@ async function vistaPanel() {
     </div>
   </main>`;
   app.querySelector<HTMLButtonElement>('#salir')!.onclick = () => { detener(); cerrarSesion(); };
+  app.querySelector<HTMLButtonElement>('#miperfil')!.onclick = () => vistaEditar(p.nombre, avatar, () => { vistaPanel(); });
+  iniciarChat(uid);
   montarAurora();
   animarPanel(app);
   luzDeFoco(app);
@@ -189,7 +251,7 @@ function hace(ms: number): string {
 function itemFeed(e: any): string {
   const j = String(e.juego ?? 'portal');
   return `<li data-id="${esc(e.id)}" data-j="${esc(j)}">
-    <span class="av">${esc(e.avatar ?? '🙂')}</span>
+    <span class="av">${avatarHTML(e.avatar ?? '🙂', 'av-img')}</span>
     <div class="tx">${esc(describirActividad(e))}<small><span class="tag t-${esc(j)}">${esc((NOMBRE_JUEGO as Record<string, string>)[j] ?? 'Apexora')}</span> <time data-ms="${tms(e)}">${hace(tms(e))}</time></small></div>
   </li>`;
 }
@@ -228,26 +290,69 @@ function iniciarFeed() {
     aplicarFiltro();
   }, 30);
   reloj = window.setInterval(() => {
-    document.querySelectorAll<HTMLElement>('#feed time[data-ms]').forEach((t) => { t.textContent = hace(Number(t.dataset.ms)); });
+    document.querySelectorAll<HTMLElement>('#feed time[data-ms], #chat time[data-ms]').forEach((t) => { t.textContent = hace(Number(t.dataset.ms)); });
   }, 30000);
 }
 function detenerFeed() {
   offAct?.(); offAct = null; clearInterval(reloj);
   vistos.clear(); primeraCarga = true;
 }
-function detener() { detenerFeed(); offFrag?.(); offFrag = null; limpiar(); }
+
+/* ---------- Chat libre ---------- */
+let offChat: (() => void) | null = null;
+let ultimoMsg = 0;
+function itemChat(m: any, uid: string): string {
+  return `<li class="msg ${m.uid === uid ? 'mio' : ''}"><span class="av">${avatarHTML(m.avatar ?? '🙂', 'av-img')}</span>
+    <div class="bub"><div class="quien-msg"><b>${esc(m.nombre ?? 'Alguien')}</b><time data-ms="${tms(m)}">${hace(tms(m))}</time></div><p>${esc(m.texto ?? '')}</p></div></li>`;
+}
+function iniciarChat(uid: string) {
+  offChat?.(); offChat = null;
+  const ul = document.querySelector<HTMLUListElement>('#chat')!;
+  const f = document.querySelector<HTMLFormElement>('#chatf')!;
+  const inp = f.querySelector<HTMLInputElement>('input')!;
+  const err = document.querySelector<HTMLElement>('#chaterr')!;
+  let primera = true;
+  offChat = escucharChat((ms: any[] | null) => {
+    if (!ms) { ul.innerHTML = '<li class="vacio">No se pudo cargar el chat. ¿Están publicadas las reglas de Firebase?</li>'; return; }
+    const abajo = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 90;
+    ul.innerHTML = ms.length ? ms.map((m) => itemChat(m, uid)).join('') : '<li class="vacio">Aún no hay mensajes. ¡Escribe el primero! 👋</li>';
+    if (abajo || primera) ul.scrollTop = ul.scrollHeight;
+    primera = false;
+  }, 50);
+  document.querySelectorAll<HTMLButtonElement>('.chat-emojis .emo').forEach((b) => {
+    b.onclick = () => {
+      const e = b.dataset.e!;
+      if (inp.value.length + e.length > 200) return;
+      const i = inp.selectionStart ?? inp.value.length;
+      inp.setRangeText(e, i, inp.selectionEnd ?? i, 'end');
+      inp.focus();
+    };
+  });
+  f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const t = inp.value.trim(); if (!t) return;
+    if (Date.now() - ultimoMsg < 2500) { err.textContent = 'Espera un momento antes de enviar otro mensaje 🙂'; return; }
+    err.textContent = ''; ultimoMsg = Date.now(); inp.value = '';
+    try { await enviarMensaje(t); }
+    catch { err.textContent = 'No se pudo enviar el mensaje. Inténtalo de nuevo.'; inp.value = t; }
+  };
+}
+function detener() { detenerFeed(); offFrag?.(); offFrag = null; offChat?.(); offChat = null; limpiar(); }
 
 /* ---------- Arranque ---------- */
 let ocupado = false;
 onSesion(async (u: object | null) => {
-  if (!u || !(u as { email?: string | null }).email?.endsWith('@apexora-sala.app')) { detener(); vistaLogin(); return; }
+  if (!u || !(u as { email?: string | null }).email?.endsWith('@apexora-sala.app')) { detener(); try { sessionStorage.removeItem('apx-quien'); } catch { /* */ } vistaLogin(); return; }
   if (ocupado) return;
   ocupado = true;
   try {
     await registrarVisita();
     const volver = new URLSearchParams(location.search).get('volver');
     if (volver && volver.startsWith(location.origin)) { location.href = volver; return; }
-    await vistaPanel();
+    const { nombre, avatar } = await datosPerfil();
+    let visto = false;
+    try { visto = !!sessionStorage.getItem('apx-quien'); sessionStorage.setItem('apx-quien', '1'); } catch { /* sin storage */ }
+    if (visto) await vistaPanel(); else vistaQuien(nombre, avatar);
   } catch (e) {
   console.error(e);
   const x = e as { code?: string; message?: string };

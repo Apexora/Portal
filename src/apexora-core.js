@@ -224,3 +224,64 @@ export function escucharFragmentos(cb) {
   });
   return () => { off(); offAuth(); };
 }
+const BASE_AV = import.meta.env.BASE_URL;   // "/Portal/"
+
+/* ---------- Avatares de perfil ----------
+   Las imágenes viven en /avatares (carpeta public del Portal). Al compilar se genera avatares.json con la lista.
+   En el perfil se guarda solo el id (nombre del archivo sin extensión). Si el id no es una imagen (p. ej. un emoji
+   de una cuenta vieja), se dibuja tal cual. Cualquier página puede usarlos:
+     const { cargarAvatares, avatarHTML } = await import("https://apexora.github.io/Portal/apexora-core.js");
+     await cargarAvatares();  el.innerHTML = avatarHTML(perfil.avatar);                                         */
+const _escH = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let _avs = null, _lista = [];
+export function cargarAvatares() {
+  return (_avs ||= fetch(BASE_AV + "avatares/avatares.json", { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : []))
+    .catch(() => [])
+    .then((l) => (_lista = Array.isArray(l) ? l : [])));
+}
+export const AVATARES_EMOJI = ["🦊", "🐺", "🦉", "🐉", "🦁", "🐙", "🦅", "🐢"];
+/** Opciones para elegir: las imágenes subidas o, si todavía no hay ninguna, los emojis de siempre. */
+export const opcionesAvatar = () => (_lista.length ? _lista : AVATARES_EMOJI.map((e) => ({ id: e, nombre: e })));
+/** HTML del avatar (llama antes a `await cargarAvatares()`). `clase` se le pone a la <img> o al <span>. */
+export function avatarHTML(id, clase = "apx-av") {
+  const a = _lista.find((x) => x.id === id);
+  if (a) return `<img class="${_escH(clase)}" src="${BASE_AV}avatares/${encodeURIComponent(a.archivo)}" alt="" loading="lazy" decoding="async">`;
+  return `<span class="${_escH(clase)} apx-av--emoji">${_escH(id || "🙂")}</span>`;
+}
+
+/** Escucha en vivo mi perfil público (name, avatar). Devuelve la función para dejar de escuchar. */
+export function escucharPerfil(cb) {
+  let off = () => {};
+  const offAuth = onAuthStateChanged(auth, (u) => {
+    off();
+    if (u?.email?.endsWith(DOMINIO)) off = onSnapshot(doc(db, "apexora_profiles", u.uid), (s) => { if (s.exists()) cb(s.data()); }, () => {});
+  });
+  return () => { off(); offAuth(); };
+}
+/** Cambia mi imagen de perfil (queda para todas las plataformas). */
+export async function cambiarAvatar(id) {
+  const u = auth.currentUser; if (!u) return false;
+  await updateDoc(doc(db, "apexora_profiles", u.uid), { avatar: String(id).slice(0, 8) });
+  _yo = null;
+  return true;
+}
+
+/* ---------- Chat libre del Portal ----------
+   Colección apexora_chat: un documento por mensaje (solo se crean; las rules no permiten editar ni borrar).
+   El texto se guarda plano (máx. 200); quien lo pinte debe escaparlo. */
+const COL_CHAT = "apexora_chat";
+export async function enviarMensaje(texto) {
+  const t = String(texto ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!t) return false;
+  const y = await quienSoy(); if (!y) return false;
+  await addDoc(collection(db, COL_CHAT), {
+    uid: y.uid, nombre: String(y.nombre).slice(0, 24), avatar: String(y.avatar).slice(0, 8), texto: t, ts: serverTimestamp(),
+  });
+  return true;
+}
+/** cb(mensajes del más viejo al más nuevo) · cb(null) si falla (p. ej. rules sin publicar). */
+export function escucharChat(cb, n = 50) {
+  const q = query(collection(db, COL_CHAT), orderBy("ts", "desc"), limit(n));
+  return onSnapshot(q, (s) => cb(s.docs.map((d) => ({ id: d.id, ...d.data() })).reverse()), () => cb(null));
+}
