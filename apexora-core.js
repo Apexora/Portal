@@ -3,7 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
   signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, runTransaction, updateDoc, increment,
-  serverTimestamp, collection, query, orderBy, limit, getDocs, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  serverTimestamp, collection, query, orderBy, limit, getDocs, onSnapshot, addDoc, where, Timestamp, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAsw466_wzsiLtbjw6FXZ1_O3HQ_AkVyU8",
@@ -38,11 +38,13 @@ export const CATALOGO_LOGROS = {
 const CORTE_ODITA = Date.UTC(2026, 9, 18);
 const ODITA_QUE_DABAN = { racha_7: 1, racha_30: 5, tcg_10_victorias: 1 };
 async function quitarOditaDeLogros() {
+  const marca = "apx-sinodita-" + (auth.currentUser?.uid ?? "");
+  try { if (localStorage.getItem(marca) || sessionStorage.getItem(marca)) return; sessionStorage.setItem(marca, "1"); } catch { /* sin storage */ }
   try {
     const ref = refJugador();
     await runTransaction(db, async (tx) => {
       const x = (await tx.get(ref)).data();
-      if (!x || x.migr?.sinOditaLogros) return;
+      if (!x || x.migr?.sinOditaLogros) { try { localStorage.setItem(marca, "1"); } catch { /* */ } return; }
       let n = 0;
       for (const [id, o] of Object.entries(ODITA_QUE_DABAN)) {
         const f = x.logros?.[id]?.fecha;
@@ -50,6 +52,7 @@ async function quitarOditaDeLogros() {
       }
       tx.update(ref, { "fragmentos.rara": Math.max(0, (x.fragmentos?.rara ?? 0) - n), "migr.sinOditaLogros": true });
     });
+    try { localStorage.setItem(marca, "1"); } catch { /* */ }
   } catch { /* se reintenta en la próxima visita */ }
 }
 
@@ -80,7 +83,7 @@ export function requerirUsuario(portal = "/Portal/") {
   return new Promise((res) => {
     const off = onAuthStateChanged(auth, async (u) => {
       off();
-      if (u?.email?.endsWith(DOMINIO)) { await registrarVisita(); contarVisitaPagina(); res(u); }
+      if (u?.email?.endsWith(DOMINIO)) { await registrarVisita(); contarVisitaPagina(); iniciarPresencia(juegoDePagina()); res(u); }
       else location.href = portal + "?volver=" + encodeURIComponent(location.href);
     });
   });
@@ -313,6 +316,7 @@ export function escucharChat(cb, n = 50) {
 /* ---------- Visitas por página y datos para la pantallita del Portal ----------
    Cada página que llame a requerirUsuario() suma 1 visita por sesión a stats.visitas.<juego> (según su ruta). */
 const PAGINAS = { "/tcg/": "tcg", "/album/": "album", "/desafio/": "sala", "/lore/": "lore" };
+const juegoDePagina = () => Object.entries(PAGINAS).find(([r]) => location.pathname.toLowerCase().startsWith(r))?.[1] ?? "portal";
 async function contarVisitaPagina() {
   try {
     const ruta = location.pathname.toLowerCase();
@@ -340,4 +344,48 @@ export async function perfilesPublicos(uids) {
     try { const s = await getDoc(doc(db, "apexora_profiles", u)); if (s.exists()) out[u] = { name: s.data().name, avatar: s.data().avatar }; } catch { /* sin perfil */ }
   }));
   return out;
+}
+
+/* ---------- Comunidad y competencia ---------- */
+/** Ficha pública de un jugador (racha, logros, cristales, visitas). null si no se pudo leer. */
+export async function perfilJugador(uid) {
+  const [j, p] = await Promise.all([getDoc(doc(db, COL, uid)), getDoc(doc(db, "apexora_profiles", uid)).catch(() => null)]);
+  if (!j.exists()) return null;
+  const d = j.data(), pf = p && p.exists() ? p.data() : {};
+  return { uid, nombre: pf.name || d.nombre || "Jugador", avatar: pf.avatar || "🙂",
+    streak: d.streak ?? {}, logros: Object.keys(d.logros ?? {}), fragmentos: d.fragmentos ?? {}, stats: d.stats ?? {} };
+}
+/** Clasificación por un campo numérico de apexora_players (p. ej. "streak.best"). Solo valores > 0. */
+export async function rankingPor(campo, n = 10) {
+  const docs = (await getDocs(query(collection(db, COL), orderBy(campo, "desc"), limit(n)))).docs;
+  const leer = (o) => campo.split(".").reduce((a, k) => a?.[k], o) ?? 0;
+  return docs.map((d) => ({ uid: d.id, nombre: d.data().nombre, valor: leer(d.data()) })).filter((x) => x.valor > 0);
+}
+/** Puesto de alguien con `valor` en ese campo (1 = primero). */
+export async function miPuesto(campo, valor) {
+  const s = await getCountFromServer(query(collection(db, COL), where(campo, ">", valor)));
+  return s.data().count + 1;
+}
+
+/* Presencia: cada ~90 s (con la pestaña visible) cada jugador renueva apexora_presence/{uid}. «En línea» = renovó hace < 3 min. */
+const COL_PRES = "apexora_presence";
+let _latido = 0;
+export function iniciarPresencia(donde = "portal") {
+  if (_latido) return;
+  const latir = async () => {
+    if (document.visibilityState !== "visible" || !auth.currentUser) return;
+    try {
+      const y = await quienSoy(); if (!y) return;
+      await setDoc(doc(db, COL_PRES, y.uid), { nombre: String(y.nombre).slice(0, 24), avatar: String(y.avatar).slice(0, 8), donde: String(donde).slice(0, 8), ts: serverTimestamp() });
+    } catch { /* no es crítico */ }
+  };
+  latir();
+  _latido = setInterval(latir, 90000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") latir(); });
+}
+/** cb([{ uid, nombre, avatar, donde, ts }]) · cb(null) si falla. Filtra por ts en el cliente (los que dejan de latir caducan solos). */
+export function escucharEnLinea(cb, minutos = 3) {
+  const desde = Timestamp.fromMillis(Date.now() - minutos * 60000);
+  const q = query(collection(db, COL_PRES), where("ts", ">", desde), orderBy("ts", "desc"), limit(30));
+  return onSnapshot(q, (s) => cb(s.docs.map((d) => ({ uid: d.id, ...d.data() }))), () => cb(null));
 }
