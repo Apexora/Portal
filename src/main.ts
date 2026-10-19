@@ -2,10 +2,11 @@ import './style.css';
 import { doc, getDoc } from 'firebase/firestore';
 import {
   auth, db, onSesion, iniciarSesion, registrar, cerrarSesion,
-  registrarVisita, obtenerPerfil, ranking, CATALOGO_LOGROS,
+  registrarVisita, obtenerPerfil, CATALOGO_LOGROS,
   escucharActividad, escucharFragmentos, describirActividad, NOMBRE_JUEGO,
   cargarAvatares, avatarHTML, opcionesAvatar, cambiarAvatar, enviarMensaje, escucharChat,
   topVisitas, actividadReciente, perfilesPublicos,
+  perfilJugador, rankingPor, miPuesto, iniciarPresencia, escucharEnLinea,
 } from './apexora-core.js';
 import './fase1.css';
 import './perfil-chat.css';
@@ -47,6 +48,14 @@ function msgErr(e: unknown): string {
   if (c.includes('operation-not-allowed')) return 'Activa Email/Contraseña en Firebase → Authentication.';
   if (c.includes('network')) return 'Sin conexión con Firebase.';
   return 'No se pudo completar. Inténtalo de nuevo.';
+}
+
+/* ---------- Rango (según logros desbloqueados) ---------- */
+const RANGOS: [string, string][] = [['🌱', 'Novato'], ['⚔️', 'Aprendiz'], ['🛡️', 'Veterano'], ['🔮', 'Maestro'], ['👑', 'Leyenda']];
+function rango(n: number): string {
+  const total = Object.keys(CATALOGO_LOGROS).length || 1, r = n / total;
+  const [ico, nom] = RANGOS[r >= 1 ? 4 : r >= 0.75 ? 3 : r >= 0.5 ? 2 : r >= 0.25 ? 1 : 0];
+  return `${ico} ${nom}`;
 }
 
 /* ---------- Perfil estilo Netflix ---------- */
@@ -128,8 +137,8 @@ async function vistaLogin(crear = false) {
 async function vistaPanel() {
   app.innerHTML = '<p class="cargando">Cargando…</p>';
   const uid = auth.currentUser!.uid;
-  const [p, top, prof] = await Promise.all([
-    obtenerPerfil(), ranking(5), getDoc(doc(db, 'apexora_profiles', uid)),
+  const [p, prof] = await Promise.all([
+    obtenerPerfil(), getDoc(doc(db, 'apexora_profiles', uid)),
   ]);
   if (!p) { app.innerHTML = '<p class="cargando">No se pudo cargar tu perfil. Recarga la página.</p>'; return; }
   const avatar = prof.exists() ? prof.data().avatar : '🙂';
@@ -152,6 +161,8 @@ async function vistaPanel() {
     <section class="heroe">
       <span class="apx-eyebrow">Bienvenido de vuelta</span>
       <h1>${esc(p.nombre)}</h1>
+      <p class="rango" title="Tu rango sube al desbloquear logros">${rango(Object.keys(p.logros ?? {}).length)} · ${Object.keys(p.logros ?? {}).length}/${Object.keys(CATALOGO_LOGROS).length} logros</p>
+      <div class="enlinea" id="enlinea" hidden></div>
     </section>
     <section class="esencias" aria-label="Tus cristales">
       <div class="esencia sinfalita">${cristal('sinfalita')}<b>${p.fragmentos.comun}</b><small>${NOMBRE_CRISTAL.comun}</small></div>
@@ -192,13 +203,21 @@ async function vistaPanel() {
 
     <div class="dos">
       <section class="apx-spot"><h2>Logros</h2><ul class="logros">${logros}</ul></section>
-      <section class="apx-spot"><h2>Mejores rachas</h2><ol class="rank">${top.map((r: any) =>
-        `<li><span>${esc(r.nombre)}</span><b>${r.streak?.best ?? 0}</b></li>`).join('')}</ol></section>
+      <section class="apx-spot clasif"><h2>Clasificación</h2>
+        <div class="tabs" role="group" aria-label="Tipo de clasificación">
+          <button class="chip on" data-r="rachas">🔥 Rachas</button><button class="chip" data-r="cristales">💎 Cristales</button><button class="chip" data-r="actividad">⚡ Actividad</button>
+        </div>
+        <ol class="rank2" id="rank"><li class="vacio">Cargando…</li></ol>
+        <p class="tupuesto" id="tupuesto"></p>
+      </section>
     </div>
   </main>`;
   app.querySelector<HTMLButtonElement>('#salir')!.onclick = () => { detener(); cerrarSesion(); };
   app.querySelector<HTMLButtonElement>('#miperfil')!.onclick = () => vistaEditar(p.nombre, avatar, () => { vistaPanel(); });
-  iniciarChat(uid);
+  iniciarChat(uid, p.nombre);
+  iniciarRank(uid, p);
+  iniciarEnLinea();
+  iniciarPresencia('portal');
   montarAurora();
   animarPanel(app);
   luzDeFoco(app);
@@ -256,7 +275,7 @@ function hace(ms: number): string {
 function itemFeed(e: any): string {
   const j = String(e.juego ?? 'portal');
   return `<li data-id="${esc(e.id)}" data-j="${esc(j)}">
-    <span class="av">${avatarHTML(e.avatar ?? '🙂', 'av-img')}</span>
+    <button class="av jug" data-uid="${esc(e.uid ?? '')}" title="Ver jugador" aria-label="Ver jugador ${esc(e.nombre ?? '')}">${avatarHTML(e.avatar ?? '🙂', 'av-img')}</button>
     <div class="tx">${esc(describirActividad(e))}<small><span class="tag t-${esc(j)}">${esc((NOMBRE_JUEGO as Record<string, string>)[j] ?? 'Apexora')}</span> <time data-ms="${tms(e)}">${hace(tms(e))}</time></small></div>
   </li>`;
 }
@@ -308,6 +327,10 @@ type Fila = { uid: string; nombre: string; avatar: string; n: number };
 type DatosMini = { t: number; mejores: Fila[]; visitas: Fila[] };
 const cacheMini: Record<string, DatosMini> = {};
 let actCache: { t: number; evs: any[] } | null = null;
+async function actividadCache(): Promise<any[]> {
+  if (!actCache || Date.now() - actCache.t > 60000) actCache = { t: Date.now(), evs: await actividadReciente(300) };
+  return actCache.evs;
+}
 const MEJOR: Record<string, [string, string]> = {   // [título, qué se cuenta]
   tcg: ['Más victorias', 'victorias'], sala: ['Más retos superados', 'retos'], album: ['Más sobres abiertos', 'sobres'],
 };
@@ -315,9 +338,9 @@ async function datosMini(id: string): Promise<DatosMini> {
   const c = cacheMini[id]; if (c && Date.now() - c.t < 60000) return c;
   const mejores: Fila[] = [];
   if (MEJOR[id]) {
-    if (!actCache || Date.now() - actCache.t > 60000) actCache = { t: Date.now(), evs: await actividadReciente(300) };
     const cuenta = new Map<string, Fila>();
-    for (const e of actCache.evs) {
+    const evs = await actividadCache().catch(() => [] as any[]);
+    for (const e of evs) {
       const d = e.datos ?? {};
       if (e.juego !== id) continue;
       const vale = (id === 'tcg' && e.tipo === 'duelo') || (id === 'sala' && e.tipo === 'reto' && d.gano) || (id === 'album' && e.tipo === 'sobre');
@@ -384,25 +407,51 @@ function activarMini(raiz: HTMLElement) {
   });
 }
 
+/* ---------- Silenciar jugadores (solo en este navegador) ---------- */
+const leerSil = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem('apx-silenciados') || '[]')); } catch { return new Set(); } };
+const guardarSil = (c: Set<string>) => { try { localStorage.setItem('apx-silenciados', JSON.stringify([...c])); } catch { /* sin storage */ } };
+
 /* ---------- Chat libre ---------- */
 let offChat: (() => void) | null = null;
 let ultimoMsg = 0;
-function itemChat(m: any, uid: string): string {
-  return `<li class="msg ${m.uid === uid ? 'mio' : ''}"><span class="av">${avatarHTML(m.avatar ?? '🙂', 'av-img')}</span>
-    <div class="bub"><div class="quien-msg"><b>${esc(m.nombre ?? 'Alguien')}</b><time data-ms="${tms(m)}">${hace(tms(m))}</time></div><p>${esc(m.texto ?? '')}</p></div></li>`;
+let msgsChat: any[] = [];
+let yoChat = { uid: '', nombre: '' };
+let sinLeer = 0;
+const TITULO = document.title;
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { sinLeer = 0; document.title = TITULO; } });
+
+function itemChat(m: any, uid: string, nombre: string): string {
+  const limpio = nombre.replace(/[^\w]/g, '');
+  const dirigido = !!limpio && m.uid !== uid && new RegExp(`@${limpio}(?!\\w)`, 'i').test(String(m.texto ?? ''));
+  const txt = esc(m.texto ?? '').replace(/@(\w{2,20})/g, (x: string, n: string) => `<span class="men ${n.toLowerCase() === limpio.toLowerCase() ? 'yo' : ''}">${x}</span>`);
+  return `<li class="msg ${m.uid === uid ? 'mio' : ''} ${dirigido ? 'mencion' : ''}"><button class="av jug" data-uid="${esc(m.uid ?? '')}" title="Ver jugador" aria-label="Ver jugador ${esc(m.nombre ?? '')}">${avatarHTML(m.avatar ?? '🙂', 'av-img')}</button>
+    <div class="bub"><div class="quien-msg"><b>${esc(m.nombre ?? 'Alguien')}</b><time data-ms="${tms(m)}">${hace(tms(m))}</time></div><p>${txt}</p></div></li>`;
 }
-function iniciarChat(uid: string) {
+function pintarChat(primera = false) {
+  const ul = document.querySelector<HTMLUListElement>('#chat'); if (!ul) return;
+  const sil = leerSil();
+  const ms = msgsChat.filter((m) => !sil.has(m.uid));
+  const abajo = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 90;
+  ul.innerHTML = ms.length ? ms.map((m) => itemChat(m, yoChat.uid, yoChat.nombre)).join('') : '<li class="vacio">Aún no hay mensajes. ¡Escribe el primero! 👋</li>';
+  if (abajo || primera) ul.scrollTop = ul.scrollHeight;
+}
+function iniciarChat(uid: string, nombre: string) {
   offChat?.(); offChat = null;
+  yoChat = { uid, nombre };
   const ul = document.querySelector<HTMLUListElement>('#chat')!;
   const f = document.querySelector<HTMLFormElement>('#chatf')!;
   const inp = f.querySelector<HTMLInputElement>('input')!;
   const err = document.querySelector<HTMLElement>('#chaterr')!;
   let primera = true;
+  const vistosChat = new Set<string>();
   offChat = escucharChat((ms: any[] | null) => {
     if (!ms) { ul.innerHTML = '<li class="vacio">No se pudo cargar el chat. ¿Están publicadas las reglas de Firebase?</li>'; return; }
-    const abajo = ul.scrollHeight - ul.scrollTop - ul.clientHeight < 90;
-    ul.innerHTML = ms.length ? ms.map((m) => itemChat(m, uid)).join('') : '<li class="vacio">Aún no hay mensajes. ¡Escribe el primero! 👋</li>';
-    if (abajo || primera) ul.scrollTop = ul.scrollHeight;
+    const sil = leerSil();
+    const nuevos = ms.filter((m) => !vistosChat.has(m.id) && m.uid !== uid && !sil.has(m.uid)).length;
+    ms.forEach((m) => vistosChat.add(m.id));
+    msgsChat = ms;
+    pintarChat(primera);
+    if (!primera && nuevos && document.hidden) { sinLeer += nuevos; document.title = `(${sinLeer}) ${TITULO}`; }
     primera = false;
   }, 50);
   document.querySelectorAll<HTMLButtonElement>('.chat-emojis .emo').forEach((b) => {
@@ -420,10 +469,137 @@ function iniciarChat(uid: string) {
     if (Date.now() - ultimoMsg < 2500) { err.textContent = 'Espera un momento antes de enviar otro mensaje 🙂'; return; }
     err.textContent = ''; ultimoMsg = Date.now(); inp.value = '';
     try { await enviarMensaje(t); }
-    catch { err.textContent = 'No se pudo enviar el mensaje. Inténtalo de nuevo.'; inp.value = t; }
+    catch { err.textContent = 'No se pudo enviar el mensaje. Inténtalo de nuevo.'; inp.value = t; ultimoMsg = 0; }
   };
 }
-function detener() { ocultarMini(); detenerFeed(); offFrag?.(); offFrag = null; offChat?.(); offChat = null; limpiar(); }
+
+/* ---------- En línea ahora ---------- */
+let offLinea: (() => void) | null = null;
+let relojLinea = 0;
+function iniciarEnLinea() {
+  offLinea?.(); clearInterval(relojLinea);
+  const caja = document.querySelector<HTMLElement>('#enlinea')!;
+  let lista: any[] = [];
+  const pintar = () => {
+    const vivos = lista.filter((x) => Date.now() - tms(x) < 3 * 60000);
+    if (!vivos.length) { caja.hidden = true; return; }
+    caja.hidden = false;
+    const ver = vivos.slice(0, 10);
+    caja.innerHTML = `<span class="pto" aria-hidden="true"></span><b>${vivos.length} en línea</b>
+      <span class="en-avs">${ver.map((x) => `<button class="av jug" data-uid="${esc(x.uid)}" title="${esc(x.nombre ?? '')} · ${esc((NOMBRE_JUEGO as Record<string, string>)[x.donde] ?? 'Apexora')}" aria-label="Ver jugador ${esc(x.nombre ?? '')}">${avatarHTML(x.avatar ?? '🙂', 'av-img')}</button>`).join('')}</span>
+      ${vivos.length > ver.length ? `<small>+${vivos.length - ver.length}</small>` : ''}`;
+  };
+  offLinea = escucharEnLinea((l: any[] | null) => { lista = l ?? []; pintar(); });
+  relojLinea = window.setInterval(pintar, 30000);
+}
+
+/* ---------- Clasificación ---------- */
+type RankPerfil = { streak?: { best?: number }; fragmentos?: { comun?: number } };
+const CAMPO: Record<string, string> = { rachas: 'streak.best', cristales: 'fragmentos.comun' };
+const UNIDAD: Record<string, string> = { rachas: '🔥', cristales: '💎', actividad: 'pts' };
+const MEDALLA = ['🥇', '🥈', '🥉'];
+const cacheRank: Record<string, { t: number; filas: Fila[] }> = {};
+async function filasRank(tipo: string): Promise<Fila[]> {
+  const c = cacheRank[tipo]; if (c && Date.now() - c.t < 45000) return c.filas;
+  let filas: Fila[];
+  if (tipo === 'actividad') {
+    const cuenta = new Map<string, Fila>();
+    for (const e of await actividadCache()) {
+      const d = e.datos ?? {};
+      const pts = e.tipo === 'duelo' ? 3 : e.tipo === 'reto' ? (d.gano ? 2 : 0) : e.tipo === 'sobre' ? 1 : 0;
+      if (!pts) continue;
+      const f = cuenta.get(e.uid) ?? { uid: e.uid, nombre: String(e.nombre ?? 'Alguien'), avatar: String(e.avatar ?? '🙂'), n: 0 };
+      f.n += pts; cuenta.set(e.uid, f);
+    }
+    filas = [...cuenta.values()].sort((a, b) => b.n - a.n).slice(0, 10);
+  } else {
+    const r = await rankingPor(CAMPO[tipo], 10);
+    const pf = (await perfilesPublicos(r.map((x: any) => x.uid))) as Record<string, { name?: string; avatar?: string }>;
+    filas = r.map((x: any) => ({ uid: x.uid, nombre: String(pf[x.uid]?.name ?? x.nombre ?? 'Alguien'), avatar: String(pf[x.uid]?.avatar ?? '🙂'), n: x.valor }));
+  }
+  cacheRank[tipo] = { t: Date.now(), filas };
+  return filas;
+}
+let tipoRank = 'rachas';
+async function pintarRank(uid: string, p: RankPerfil) {
+  const ol = document.querySelector<HTMLOListElement>('#rank'), pie = document.querySelector<HTMLElement>('#tupuesto');
+  if (!ol || !pie) return;
+  const tipo = tipoRank;
+  let filas: Fila[] = [];
+  try { filas = await filasRank(tipo); } catch { if (tipo === tipoRank) ol.innerHTML = '<li class="vacio">No se pudo cargar la clasificación.</li>'; return; }
+  if (tipo !== tipoRank) return;                               // cambió de pestaña mientras cargaba
+  ol.innerHTML = filas.length ? filas.map((f, i) => `<li class="${f.uid === uid ? 'yo' : ''}">
+      <span class="pos">${MEDALLA[i] ?? i + 1}</span>
+      <button class="fila jug" data-uid="${esc(f.uid)}"><span class="av">${avatarHTML(f.avatar, 'av-img')}</span><span class="nm">${esc(f.nombre)}</span></button>
+      <b>${f.n} <small>${UNIDAD[tipo]}</small></b></li>`).join('') : '<li class="vacio">Aún no hay datos. ¡Sé el primero! ✨</li>';
+  const i = filas.findIndex((f) => f.uid === uid);
+  if (tipo === 'actividad') { pie.textContent = i >= 0 ? `Vas #${i + 1} · victoria en Cartas 3 pts, reto superado 2, sobre 1` : 'Gana partidas, supera retos y abre sobres para entrar · victoria 3 pts, reto 2, sobre 1'; return; }
+  if (i >= 0) { pie.textContent = `Tu puesto: #${i + 1}`; return; }
+  const mio = tipo === 'rachas' ? p.streak?.best ?? 0 : p.fragmentos?.comun ?? 0;
+  pie.textContent = '';
+  try { const n = await miPuesto(CAMPO[tipo], mio); if (tipo === tipoRank) pie.textContent = `Tu puesto: #${n}`; } catch { /* sin permiso para contar */ }
+}
+function iniciarRank(uid: string, p: RankPerfil) {
+  tipoRank = 'rachas';
+  document.querySelectorAll<HTMLButtonElement>('.tabs .chip').forEach((b) => {
+    b.onclick = () => {
+      tipoRank = b.dataset.r!;
+      document.querySelectorAll('.tabs .chip').forEach((x) => x.classList.toggle('on', x === b));
+      void pintarRank(uid, p);
+    };
+  });
+  void pintarRank(uid, p);
+}
+
+/* ---------- Tarjeta de jugador ---------- */
+let tarjeta: HTMLDialogElement | null = null;
+async function abrirTarjeta(uid: string) {
+  if (!tarjeta) {
+    tarjeta = document.createElement('dialog'); tarjeta.className = 'tj';
+    tarjeta.addEventListener('click', (e) => { if (e.target === tarjeta) tarjeta!.close(); });
+    document.body.appendChild(tarjeta);
+  }
+  const t = tarjeta;
+  t.innerHTML = '<button class="x" aria-label="Cerrar">✕</button><p class="mini-vacio">Cargando jugador…</p>';
+  t.querySelector<HTMLButtonElement>('.x')!.onclick = () => t.close();
+  if (!t.open) t.showModal();
+  const j = await perfilJugador(uid).catch(() => null);
+  if (!t.open) return;
+  if (!j) { t.innerHTML = '<button class="x" aria-label="Cerrar">✕</button><p class="mini-vacio">No se pudo cargar este jugador.</p>'; t.querySelector<HTMLButtonElement>('.x')!.onclick = () => t.close(); return; }
+  await cargarAvatares();
+  const yo = uid === auth.currentUser?.uid, sil = leerSil().has(uid);
+  const ids = j.logros as string[], cat = CATALOGO_LOGROS as Record<string, any>;
+  const vis = Object.entries((j.stats?.visitas ?? {}) as Record<string, number>).filter(([, n]) => n > 0)
+    .map(([k, n]) => `${esc((NOMBRE_JUEGO as Record<string, string>)[k] ?? k)} ${n}`).join(' · ');
+  t.innerHTML = `<button class="x" aria-label="Cerrar">✕</button>
+    <div class="tj-cab"><span class="av-tile grande">${avatarHTML(j.avatar, 'av-img')}</span><h3>${esc(j.nombre)}${yo ? ' <small>(tú)</small>' : ''}</h3><p class="rango">${rango(ids.length)}</p></div>
+    <dl class="tj-dat">
+      <div><dt>Racha</dt><dd>${j.streak.current ?? 0} 🔥</dd></div><div><dt>Mejor racha</dt><dd>${j.streak.best ?? 0}</dd></div>
+      <div><dt>Logros</dt><dd>${ids.length}/${Object.keys(cat).length}</dd></div><div><dt>Sinfalita</dt><dd>${j.fragmentos.comun ?? 0}</dd></div>
+    </dl>
+    <div class="tj-logros">${ids.map((id) => `<span title="${esc(cat[id]?.nombre ?? id)}">${esc(cat[id]?.icono ?? '🏅')}</span>`).join('') || '<small>Todavía sin logros</small>'}</div>
+    ${vis ? `<p class="tj-vis">Visitas: ${vis}</p>` : ''}
+    ${yo ? '' : `<div class="acciones"><button class="primario" id="tj-men">Mencionar en el chat</button><button class="btn-ghost" id="tj-sil">${sil ? 'Dejar de silenciar' : 'Silenciar en el chat'}</button></div>`}`;
+  t.querySelector<HTMLButtonElement>('.x')!.onclick = () => t.close();
+  t.querySelector<HTMLButtonElement>('#tj-men')?.addEventListener('click', () => {
+    const inp = document.querySelector<HTMLInputElement>('#chatf input');
+    t.close();
+    if (!inp) return;
+    const m = `@${String(j.nombre).replace(/[^\w]/g, '')} `;
+    if (inp.value.length + m.length <= 200) inp.value += m;
+    inp.focus();
+  });
+  t.querySelector<HTMLButtonElement>('#tj-sil')?.addEventListener('click', () => {
+    const c = leerSil(); if (c.has(uid)) c.delete(uid); else c.add(uid);
+    guardarSil(c); t.close(); pintarChat();
+  });
+}
+app.addEventListener('click', (e) => {
+  const el = (e.target as HTMLElement).closest<HTMLElement>('[data-uid]');
+  if (el?.dataset.uid && auth.currentUser) void abrirTarjeta(el.dataset.uid);
+});
+
+function detener() { ocultarMini(); tarjeta?.close(); offLinea?.(); offLinea = null; clearInterval(relojLinea); detenerFeed(); offFrag?.(); offFrag = null; offChat?.(); offChat = null; limpiar(); }
 
 /* ---------- Arranque ---------- */
 let ocupado = false;
