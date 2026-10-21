@@ -232,6 +232,8 @@ export function describirActividad(e) {
                                 : `${n} y ${d.rival || "un rival"} jugaron a Cartas Alfa y ganó ${n}`;
     case "reto":   return d.gano ? `${n} superó el reto «${d.modo}»` : `${n} intentó el reto «${d.modo}»`;
     case "aventura":
+      if (d.vencidos) return d.conquista ? `${n} ya conquistó la nación ${d.nacion} en la Aventura 🏆`
+                                    : `${n} ya venció a ${d.vencidos} de ${d.total} rivales en la Aventura de ${d.nacion}`;
       if (d.conquista) return `${n} conquistó la nación ${d.nacion} en la Aventura 🏆`;
       if (d.jefe)      return `${n} derrotó al jefe ${d.rival} de ${d.nacion} en la Aventura`;
       return `${n} venció a ${d.rival} en la Aventura de ${d.nacion}`;
