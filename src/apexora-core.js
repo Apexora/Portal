@@ -205,7 +205,7 @@ async function quienSoy() {
   return (_yo = { uid: u.uid, nombre, avatar });
 }
 
-/** juego: "tcg" | "album" | "sala" | "portal"   tipo: "sobre" | "duelo" | "reto" | "logro"   datos: objeto chico (máx. 6 claves) */
+/** juego: "tcg" | "album" | "sala" | "portal"   tipo: "sobre" | "duelo" | "reto" | "logro" | "aventura"   datos: objeto chico (máx. 6 claves) */
 export async function registrarActividad(juego, tipo, datos = {}) {
   try {
     const y = await quienSoy(); if (!y) return false;
@@ -230,6 +230,10 @@ export function describirActividad(e) {
     case "duelo":  return d.ia ? `${n} venció a la IA en Cartas Alfa`
                                 : `${n} y ${d.rival || "un rival"} jugaron a Cartas Alfa y ganó ${n}`;
     case "reto":   return d.gano ? `${n} superó el reto «${d.modo}»` : `${n} intentó el reto «${d.modo}»`;
+    case "aventura":
+      if (d.conquista) return `${n} conquistó la nación ${d.nacion} en la Aventura 🏆`;
+      if (d.jefe)      return `${n} derrotó al jefe ${d.rival} de ${d.nacion} en la Aventura`;
+      return `${n} venció a ${d.rival} en la Aventura de ${d.nacion}`;
     case "logro":  return `${n} desbloqueó el logro «${d.nombre}» ${d.icono || ""}`.trim();
     default:       return `${n} anda por ${NOMBRE_JUEGO[e.juego] || "Apexora"}`;
   }

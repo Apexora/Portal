@@ -1,8 +1,9 @@
+/* apexora-core · UNA cuenta para todo Apexora. Esencia azul = fragmentos.comun · esencia negra = fragmentos.rara */
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
   signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, runTransaction, updateDoc, increment,
-  serverTimestamp, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
+  serverTimestamp, collection, query, orderBy, limit, getDocs, onSnapshot, addDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAsw466_wzsiLtbjw6FXZ1_O3HQ_AkVyU8",
@@ -15,10 +16,20 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-export const CATALOGO_LOGROS = { tcg_primera_victoria: { nombre: "Primer duelo",  desc: "Gana una partida de Cartas Alfa", icono: "⚔️", juego: "tcg",   premio: { comun: 25 } },
-tcg_10_victorias:     { nombre: "Duelista",      desc: "10 victorias en Cartas Alfa",     icono: "🏆", juego: "tcg",   premio: { comun: 100, rara: 1 } },
-sala_primer_reto:     { nombre: "Desafiante",    desc: "Completa tu primer reto",         icono: "🎯", juego: "sala",  premio: { comun: 25 } },
-album_primer_sobre:   { nombre: "Coleccionista", desc: "Abre tu primer sobre",            icono: "📖", juego: "album", premio: { comun: 25 } }, };
+export const CATALOGO_LOGROS = {
+  // Portal
+  primera_visita:       { nombre: "Primer paso",   desc: "Entraste a Apexora",              icono: "🌱", juego: "portal", premio: { comun: 10 } },
+  racha_3:              { nombre: "Constante",     desc: "3 días seguidos",                 icono: "🔥", juego: "portal", premio: { comun: 20 } },
+  racha_7:              { nombre: "Una semana",    desc: "7 días seguidos",                 icono: "⚡", juego: "portal", premio: { comun: 50, rara: 1 } },
+  racha_30:             { nombre: "Leyenda viva",  desc: "30 días seguidos",                icono: "👑", juego: "portal", premio: { comun: 200, rara: 5 } },
+  // Cartas Alfa
+  tcg_primera_victoria: { nombre: "Primer duelo",  desc: "Gana una partida de Cartas Alfa", icono: "⚔️", juego: "tcg",    premio: { comun: 25 } },
+  tcg_10_victorias:     { nombre: "Duelista",      desc: "10 victorias en Cartas Alfa",     icono: "🏆", juego: "tcg",    premio: { comun: 100, rara: 1 } },
+  // Sala de Desafíos
+  sala_primer_reto:     { nombre: "Desafiante",    desc: "Completa tu primer reto",         icono: "🎯", juego: "sala",   premio: { comun: 25 } },
+  // Álbum
+  album_primer_sobre:   { nombre: "Coleccionista", desc: "Abre tu primer sobre",            icono: "📖", juego: "album",  premio: { comun: 25 } },
+};
 
 const DOMINIO = "@apexora-sala.app";
 const COL = "apexora_players";
@@ -88,7 +99,7 @@ export async function registrarVisita() {
 export async function desbloquearLogro(id) {
   const def = CATALOGO_LOGROS[id]; if (!auth.currentUser || !def) return false;
   const ref = refJugador();
-  return runTransaction(db, async (tx) => {
+  const ok = await runTransaction(db, async (tx) => {
     const s = await tx.get(ref);
     if (!s.exists() || s.data().logros?.[id]) return false;
     const upd = { [`logros.${id}`]: { fecha: serverTimestamp(), juego: def.juego } };
@@ -96,15 +107,17 @@ export async function desbloquearLogro(id) {
     tx.update(ref, upd);
     return true;
   });
+  if (ok) registrarActividad(def.juego, "logro", { nombre: def.nombre, icono: def.icono });
+  return ok;
 }
 
-/* ---------- Cristales ----------
-   comun = Sinfalita, rara = Odita.
+/* ---------- Esencias ----------
+   comun = azul, rara = negra.
    premiar(): úsalo al terminar una partida. Máx 60 por premio y 300 por día;
    la rara solo puede salir una vez cada 6 h. Devuelve lo que realmente se dio. */
 export async function premiar(comun, probRara = 0) {
-  const ref = refJugador();
   try {
+    const ref = refJugador();
     return await runTransaction(db, async (tx) => {
       const x = (await tx.get(ref)).data(), dia = hoy();
       const previo = x.cupo?.dia === dia ? x.cupo.comun : 0;
@@ -142,7 +155,94 @@ export async function obtenerPerfil() {
   const s = await getDoc(refJugador());
   return s.exists() ? s.data() : null;
 }
+/** Avatar del perfil del Portal (emoji o URL/data de imagen). */
+export async function obtenerAvatar() {
+  if (!auth.currentUser) return "";
+  const s = await getDoc(doc(db, "apexora_profiles", auth.currentUser.uid));
+  return s.exists() ? String(s.data().avatar || "") : "";
+}
 export async function ranking(n = 10) {
   const q = query(collection(db, COL), orderBy("streak.best", "desc"), limit(n));
   return (await getDocs(q)).docs.map((d) => ({ uid: d.id, ...d.data() }));
+}
+
+/** Enlaza esta cuenta Apexora con la identidad propia de un juego (p. ej. jugador del Álbum). */
+export const vincular = (juego, id) =>
+  updateDoc(refJugador(), { [`vinculos.${juego}`]: id });
+
+/* ---------- Actividad de jugadores (feed del Portal) ----------
+   Colección apexora_activity: un documento por evento. Solo se crean (las rules no permiten editar ni borrar).
+   El texto se arma en el cliente con describirActividad(): nunca se guarda HTML. */
+const COL_ACT = "apexora_activity";
+let _yo = null;
+async function quienSoy() {
+  const u = auth.currentUser; if (!u) return null;
+  if (_yo && _yo.uid === u.uid) return _yo;
+  let nombre = u.email.split("@")[0], avatar = "🙂";
+  try {
+    const s = await getDoc(doc(db, "apexora_profiles", u.uid));
+    if (s.exists()) { nombre = s.data().name || nombre; avatar = s.data().avatar || avatar; }
+  } catch { /* se queda con lo básico */ }
+  return (_yo = { uid: u.uid, nombre, avatar });
+}
+
+/** juego: "tcg" | "album" | "sala" | "portal"   tipo: "sobre" | "duelo" | "reto" | "logro" | "aventura"   datos: objeto chico (máx. 6 claves) */
+export async function registrarActividad(juego, tipo, datos = {}) {
+  try {
+    const y = await quienSoy(); if (!y) return false;
+    const limpio = {};
+    for (const [k, v] of Object.entries(datos).slice(0, 6))
+      limpio[k] = typeof v === "number" || typeof v === "boolean" ? v : String(v).slice(0, 40);
+    await addDoc(collection(db, COL_ACT), {
+      uid: y.uid, nombre: String(y.nombre).slice(0, 24), avatar: String(y.avatar).slice(0, 80),   // igual que el límite del perfil; las reglas de apexora_activity deben permitir 80
+      juego, tipo, datos: limpio, ts: serverTimestamp(),
+    });
+    return true;
+  } catch { return false; }
+}
+
+export const NOMBRE_JUEGO = { tcg: "Cartas Alfa", album: "Álbum", sala: "Sala de Desafíos", portal: "Portal" };
+
+/** Texto plano de un evento (el que lo pinte debe escaparlo). */
+export function describirActividad(e) {
+  const n = e.nombre || "Alguien", d = e.datos || {};
+  switch (e.tipo) {
+    case "sobre":  return `${n} abrió un sobre${d.sobre ? " " + d.sobre : ""}`;
+    case "duelo":  return d.ia ? `${n} venció a la IA en Cartas Alfa`
+                                : `${n} y ${d.rival || "un rival"} jugaron a Cartas Alfa y ganó ${n}`;
+    case "reto":   return d.gano ? `${n} superó el reto «${d.modo}»` : `${n} intentó el reto «${d.modo}»`;
+    case "aventura":
+      if (d.conquista) return `${n} conquistó la nación ${d.nacion} en la Aventura 🏆`;
+      if (d.jefe)      return `${n} derrotó al jefe ${d.rival} de ${d.nacion} en la Aventura`;
+      return `${n} venció a ${d.rival} en la Aventura de ${d.nacion}`;
+    case "logro":  return `${n} desbloqueó el logro «${d.nombre}» ${d.icono || ""}`.trim();
+    default:       return `${n} anda por ${NOMBRE_JUEGO[e.juego] || "Apexora"}`;
+  }
+}
+
+/** Escucha en vivo los últimos eventos de todos los jugadores. Devuelve la función para dejar de escuchar. */
+export function escucharActividad(cb, n = 30) {
+  const q = query(collection(db, COL_ACT), orderBy("ts", "desc"), limit(n));
+  return onSnapshot(q, (s) => cb(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => cb([]));
+}
+
+/** Escucha en vivo mis fragmentos y mi racha (el marcador). cb({ fragmentos, streak, ... }) */
+export function escucharFragmentos(cb) {
+  let off = () => {};
+  const offAuth = onAuthStateChanged(auth, (u) => {
+    off();
+    if (u?.email?.endsWith(DOMINIO)) off = onSnapshot(doc(db, COL, u.uid), (s) => { if (s.exists()) cb(s.data()); }, () => {});
+  });
+  return () => { off(); offAuth(); };
+}
+
+
+/** Avatar de un perfil o de un evento del feed → { img: url } si es imagen (ruta relativa o con / se resuelve contra el Portal), o { txt } si es emoji corto, o {} si no hay nada pintable. */
+export function infoAvatar(v) {
+  v = String(v || "").trim();
+  if (/^(https?:|data:image\/)/.test(v)) return { img: v };
+  if (v.includes("/") || /\.(png|jpe?g|webp|gif|svg|avif)(\?.*)?$/i.test(v)) {
+    try { return { img: new URL(v, "https://apexora.github.io/Portal/").href }; } catch { return {}; }
+  }
+  return [...v].length <= 4 && v ? { txt: v } : {};
 }
