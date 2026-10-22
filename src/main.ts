@@ -20,16 +20,18 @@ const ICONOS: Record<string, string> = {
   tcg: '<rect x="4.5" y="5" width="10" height="14" rx="2" transform="rotate(-10 9.5 12)"/><rect x="9.5" y="5" width="10" height="14" rx="2" transform="rotate(9 14.5 12)"/>',
   album: '<path d="M3.5 6C6 4.4 9.5 4.4 12 6c2.5-1.6 6-1.6 8.5 0v13c-2.5-1.6-6-1.6-8.5 0-2.5-1.6-6-1.6-8.5 0Z"/><path d="M12 6v13"/>',
   sala: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.8"/><circle cx="12" cy="12" r="1.3"/>',
+  arena: '<path d="M5 4l7 7M19 4l-7 7M4 20l6-6M20 20l-6-6M3.5 5.5L5 4l1.5 1.5M17.5 5.5L19 4l1.5 1.5"/><circle cx="12" cy="12" r="2"/>',
   lore: '<path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/>',
 };
 const JUEGOS = [
   { id: 'tcg', nombre: 'Cartas Alfa', desc: 'Duelo de cartas en línea', url: '/TCG/' },
   { id: 'album', nombre: 'Álbum', desc: 'Colecciona y abre sobres', url: '/Album/' },
   { id: 'sala', nombre: 'Sala de Desafíos', desc: 'Retos y puntos', url: '/Desafio/' },
+  { id: 'arena', nombre: 'Arena', desc: 'Combates por turnos 3 contra 3', url: '/Arena/' },
   { id: 'lore', nombre: 'Lore', desc: 'Historia y datos del universo', url: '/Lore/' },
 ];
 const CLIMA: Record<string, [string, string]> = {   // [color alto, color bajo] de cada mundo (los mismos de apexora-ui.css)
-  tcg: ['#d56e6f', '#b10821'], album: ['#e3b488', '#a99441'], sala: ['#5fd0c8', '#069494'], lore: ['#a9c4a7', '#759773'],
+  tcg: ['#d56e6f', '#b10821'], album: ['#e3b488', '#a99441'], sala: ['#5fd0c8', '#069494'], arena: ['#6f9bf0', '#2556d9'], lore: ['#a9c4a7', '#759773'],
 };
 const EMOJIS = ['😀', '😂', '😍', '🥳', '😎', '🤔', '😭', '😡', '👍', '👏', '🔥', '💜', '✨', '🎉', '⚔️', '🃏'];
 
@@ -195,6 +197,7 @@ async function vistaPanel() {
           <button class="chip" data-f="tcg">Cartas</button>
           <button class="chip" data-f="album">Álbum</button>
           <button class="chip" data-f="sala">Desafíos</button>
+          <button class="chip" data-f="arena">Arena</button>
         </div>
       </div>
       <ul class="feed" id="feed"><li class="vacio">Cargando actividad…</li></ul>

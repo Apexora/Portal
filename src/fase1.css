@@ -64,7 +64,7 @@
 .feed .tx { line-height: 1.35; }
 .feed small { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .2rem; font-size: .75rem; }
 .tag { padding: .08rem .55rem; border-radius: 999px; font-size: .68rem; font-weight: 600; letter-spacing: .04em; color: #fff; }
-.t-tcg { background: #b10821; } .t-album { background: #8d7a35; } .t-sala { background: #069494; } .t-portal { background: #8a4a67; }
+.t-tcg { background: #b10821; } .t-album { background: #8d7a35; } .t-sala { background: #069494; } .t-arena { background: #2556d9; } .t-portal { background: #8a4a67; }
 .feed .vacio { display: block; color: var(--suave); text-align: center; padding: 1.2rem 0; border: 0; }
 
 /* ---------- Transición al entrar a un mundo ---------- */

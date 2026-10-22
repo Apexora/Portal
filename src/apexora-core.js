@@ -220,15 +220,15 @@ export async function registrarActividad(juego, tipo, datos = {}) {
   } catch { return false; }
 }
 
-export const NOMBRE_JUEGO = { tcg: "Cartas Alfa", album: "Álbum", sala: "Sala de Desafíos", portal: "Portal" };
+export const NOMBRE_JUEGO = { tcg: "Cartas Alfa", album: "Álbum", sala: "Sala de Desafíos", arena: "Arena", portal: "Portal" };
 
 /** Texto plano de un evento (el que lo pinte debe escaparlo). */
 export function describirActividad(e) {
   const n = e.nombre || "Alguien", d = e.datos || {};
   switch (e.tipo) {
     case "sobre":  return `${n} abrió un sobre${d.sobre ? " " + d.sobre : ""}`;
-    case "duelo":  return d.ia ? `${n} venció a la IA en Cartas Alfa`
-                                : `${n} y ${d.rival || "un rival"} jugaron a Cartas Alfa y ganó ${n}`;
+    case "duelo": { const j = NOMBRE_JUEGO[e.juego] || "Cartas Alfa";
+      return d.ia ? `${n} venció a la IA en ${j}` : `${n} y ${d.rival || "un rival"} jugaron a ${j} y ganó ${n}`; }
     case "reto":   return d.gano ? `${n} superó el reto «${d.modo}»` : `${n} intentó el reto «${d.modo}»`;
     case "aventura":
       if (d.vencidos) return d.conquista ? `${n} ya conquistó la nación ${d.nacion} en la Aventura 🏆`
@@ -320,7 +320,7 @@ export function escucharChat(cb, n = 50) {
 
 /* ---------- Visitas por página y datos para la pantallita del Portal ----------
    Cada página que llame a requerirUsuario() suma 1 visita por sesión a stats.visitas.<juego> (según su ruta). */
-const PAGINAS = { "/tcg/": "tcg", "/album/": "album", "/desafio/": "sala", "/lore/": "lore" };
+const PAGINAS = { "/tcg/": "tcg", "/album/": "album", "/desafio/": "sala", "/arena/": "arena", "/lore/": "lore" };
 const juegoDePagina = () => Object.entries(PAGINAS).find(([r]) => location.pathname.toLowerCase().startsWith(r))?.[1] ?? "portal";
 async function contarVisitaPagina() {
   try {
