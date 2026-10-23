@@ -25,6 +25,19 @@ export const CATALOGO_LOGROS = {
   // Cartas Alfa
   tcg_primera_victoria: { nombre: "Primer duelo",  desc: "Gana una partida de Cartas Alfa", icono: "⚔️", juego: "tcg",    premio: { comun: 10 } },
   tcg_10_victorias:     { nombre: "Duelista",      desc: "10 victorias en Cartas Alfa",     icono: "🏆", juego: "tcg",    premio: { comun: 30 } },
+  // Arena
+  arena_primera_victoria: { nombre: "Primer combate", desc: "Gana un combate en Arena", icono: "⚔️", juego: "arena", premio: { comun: 10 } },
+  arena_10_victorias:     { nombre: "Gladiador", desc: "10 victorias en Arena", icono: "🏆", juego: "arena", premio: { comun: 30 } },
+  arena_50_victorias:     { nombre: "Campeón de la Arena", desc: "50 victorias en Arena", icono: "👑", juego: "arena", premio: { comun: 100 } },
+  arena_primer_online:    { nombre: "Duelista online", desc: "Gana un combate online", icono: "🌐", juego: "arena", premio: { comun: 20 } },
+  arena_5_online:         { nombre: "Rival temible", desc: "5 victorias online", icono: "🔥", juego: "arena", premio: { comun: 40 } },
+  arena_historia_inicio:  { nombre: "Comienza el viaje", desc: "Gana tu primer combate del Modo Historia", icono: "🗺️", juego: "arena", premio: { comun: 10 } },
+  arena_primer_jefe:      { nombre: "Cazajefes", desc: "Derrota a tu primer jefe en la Historia", icono: "👹", juego: "arena", premio: { comun: 25 } },
+  arena_primera_gema:     { nombre: "Primera gema", desc: "Consigue tu primera gema", icono: "💎", juego: "arena", premio: { comun: 30 } },
+  arena_5_gemas:          { nombre: "Coleccionista de gemas", desc: "Consigue 5 gemas", icono: "💠", juego: "arena", premio: { comun: 60 } },
+  arena_10_gemas:         { nombre: "Cazador de gemas", desc: "Consigue 10 gemas", icono: "🔷", juego: "arena", premio: { comun: 100 } },
+  arena_15_gemas:         { nombre: "Guardián de las gemas", desc: "Consigue las 15 gemas", icono: "🌟", juego: "arena", premio: { comun: 150 } },
+  arena_historia_completa:{ nombre: "Apexora respira", desc: "Derrota a Puj y termina la Historia", icono: "🏁", juego: "arena", premio: { comun: 200 } },
   // Sala de Desafíos
   sala_primer_reto:     { nombre: "Desafiante",    desc: "Completa tu primer reto",         icono: "🎯", juego: "sala",   premio: { comun: 10 } },
   // Álbum

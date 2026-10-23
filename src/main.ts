@@ -335,7 +335,7 @@ async function actividadCache(): Promise<any[]> {
   return actCache.evs;
 }
 const MEJOR: Record<string, [string, string]> = {   // [título, qué se cuenta]
-  tcg: ['Más victorias', 'victorias'], sala: ['Más retos superados', 'retos'], album: ['Más sobres abiertos', 'sobres'],
+  tcg: ['Más victorias', 'victorias'], sala: ['Más retos superados', 'retos'], album: ['Más sobres abiertos', 'sobres'], arena: ['Más victorias', 'victorias'],
 };
 async function datosMini(id: string): Promise<DatosMini> {
   const c = cacheMini[id]; if (c && Date.now() - c.t < 60000) return c;
@@ -346,7 +346,7 @@ async function datosMini(id: string): Promise<DatosMini> {
     for (const e of evs) {
       const d = e.datos ?? {};
       if (e.juego !== id) continue;
-      const vale = (id === 'tcg' && e.tipo === 'duelo') || (id === 'sala' && e.tipo === 'reto' && d.gano) || (id === 'album' && e.tipo === 'sobre');
+      const vale = (id === 'tcg' && e.tipo === 'duelo') || (id === 'sala' && e.tipo === 'reto' && d.gano) || (id === 'album' && e.tipo === 'sobre') || (id === 'arena' && (e.tipo === 'duelo' || e.tipo === 'aventura'));
       if (!vale) continue;
       const f = cuenta.get(e.uid) ?? { uid: e.uid, nombre: String(e.nombre ?? 'Alguien'), avatar: String(e.avatar ?? '🙂'), n: 0 };
       f.n++; cuenta.set(e.uid, f);
