@@ -246,7 +246,8 @@ export function describirActividad(e) {
     case "aventura":
       if (d.vencidos) return d.conquista ? `${n} ya conquistó la nación ${d.nacion} en la Aventura 🏆`
                                     : `${n} ya venció a ${d.vencidos} de ${d.total} rivales en la Aventura de ${d.nacion}`;
-      if (d.conquista) return `${n} conquistó la nación ${d.nacion} en la Aventura 🏆`;
+      if (d.conquista) return d.gema ? `${n} obtuvo la gema de ${d.nacion} 💎` : `${n} conquistó la nación ${d.nacion} en la Aventura 🏆`;
+      if (d.subjefe)   return `${n} derrotó al subjefe ${d.rival} de ${d.nacion} en Arena`;
       if (d.jefe)      return `${n} derrotó al jefe ${d.rival} de ${d.nacion} en la Aventura`;
       return `${n} venció a ${d.rival} en la Aventura de ${d.nacion}`;
     case "logro":  return `${n} desbloqueó el logro «${d.nombre}» ${d.icono || ""}`.trim();

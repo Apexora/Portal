@@ -346,7 +346,7 @@ async function datosMini(id: string): Promise<DatosMini> {
     for (const e of evs) {
       const d = e.datos ?? {};
       if (e.juego !== id) continue;
-      const vale = (id === 'tcg' && e.tipo === 'duelo') || (id === 'sala' && e.tipo === 'reto' && d.gano) || (id === 'album' && e.tipo === 'sobre') || (id === 'arena' && (e.tipo === 'duelo' || e.tipo === 'aventura'));
+      const vale = (id === 'tcg' && e.tipo === 'duelo') || (id === 'sala' && e.tipo === 'reto' && d.gano) || (id === 'album' && e.tipo === 'sobre') || (id === 'arena' && e.tipo === 'duelo');
       if (!vale) continue;
       const f = cuenta.get(e.uid) ?? { uid: e.uid, nombre: String(e.nombre ?? 'Alguien'), avatar: String(e.avatar ?? '🙂'), n: 0 };
       f.n++; cuenta.set(e.uid, f);
